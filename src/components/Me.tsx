@@ -4,6 +4,7 @@ import type { Aesthetic, AppUser, PlayerStats, Profile } from '../types'
 import { AllowlistEditor } from './Admin'
 import { Avatar } from './Avatar'
 import { BadgeShelf } from './Badges'
+import { SHOW_INTRO_EVENT } from '../lib/intro-events'
 import { Moodboard } from './Moodboard'
 
 interface Props {
@@ -71,6 +72,10 @@ export function Me({ account, onSignIn, stats, themes }: Props) {
           Sign out
         </button>
       )}
+
+      <button className="btn btn-ghost" onClick={() => window.dispatchEvent(new Event(SHOW_INTRO_EVENT))}>
+        Watch the intro
+      </button>
 
       <p className="credits muted small">
         Aesthetic names and images come from the{' '}

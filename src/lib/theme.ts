@@ -145,14 +145,17 @@ function fontsUrl(theme: Theme) {
   return `https://fonts.googleapis.com/css2?${families.join('&')}&display=swap`
 }
 
-/** Applies a theme to the whole app, or restores the default look (null). */
-export function applyTheme(theme: Theme | null) {
-  const root = document.documentElement
+/**
+ * Applies a theme to the whole app, or restores the default look (null).
+ * `root` can be another document's root, e.g. the intro's frame.
+ */
+export function applyTheme(theme: Theme | null, root: HTMLElement = document.documentElement) {
+  const doc = root.ownerDocument
   for (const v of [...Object.values(VARS), ...EXTRA]) root.style.removeProperty(v)
   for (const key of ['buttons', 'layout', 'icons', 'motion', 'pattern', 'caps', 'deco', 'theme']) delete root.dataset[key]
   root.style.removeProperty('color-scheme')
-  document.getElementById('theme-fonts')?.remove()
-  const meta = document.querySelectorAll<HTMLMetaElement>('meta[name="theme-color"]')
+  doc.getElementById('theme-fonts')?.remove()
+  const meta = doc.querySelectorAll<HTMLMetaElement>('meta[name="theme-color"]')
 
   if (!theme) {
     meta.forEach((m) => (m.content = m.media.includes('dark') ? '#141216' : '#f5f1ea'))
@@ -179,9 +182,9 @@ export function applyTheme(theme: Theme | null) {
   root.dataset.theme = theme.id
   meta.forEach((m) => (m.content = theme.colours.bg))
 
-  const link = document.createElement('link')
+  const link = doc.createElement('link')
   link.id = 'theme-fonts'
   link.rel = 'stylesheet'
   link.href = fontsUrl(theme)
-  document.head.appendChild(link)
+  doc.head.appendChild(link)
 }

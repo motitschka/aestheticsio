@@ -151,7 +151,7 @@ const cssColour = (name: string) => {
   return typeof CSS !== 'undefined' && CSS.supports('color', c) ? c : null
 }
 
-function InfoView({ card, a, byId }: { card: InfoCard; a: Aesthetic; byId: Map<string, Aesthetic> }) {
+export function InfoView({ card, a, byId }: { card: InfoCard; a: Aesthetic; byId: Map<string, Aesthetic> }) {
   switch (card) {
     case 'intro':
       return (
@@ -268,7 +268,7 @@ function InfoView({ card, a, byId }: { card: InfoCard; a: Aesthetic; byId: Map<s
   }
 }
 
-function Done({ a, format, perfect, before, after, unlocked, theme, themeInUse, onUseTheme, onAgain, onClose }: {
+export function Done({ a, format, perfect, before, after, unlocked, theme, themeInUse, onUseTheme, onAgain, onClose }: {
   a: Aesthetic
   format: LessonFormat
   perfect: boolean

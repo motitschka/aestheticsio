@@ -29,6 +29,7 @@ import {
   type Milestone,
 } from './lib/progress'
 import type { Question } from './lib/questions'
+import { START_AS_GUEST_EVENT } from './lib/intro-events'
 import { applyTheme, themeUnlocked, type Themes } from './lib/theme'
 import { ThemeContext } from './lib/theme-context'
 import { Icon, type IconName } from './components/Icon'
@@ -255,6 +256,19 @@ export default function App() {
     setSaved(savedRef.current)
     setGuest(true)
   }
+
+  // The first-visit intro ends with "Start learning": in as a guest, unless already playing.
+  const playAsGuestRef = useRef(playAsGuest)
+  useEffect(() => {
+    playAsGuestRef.current = playAsGuest
+  })
+  const playing = !!account || guest
+  useEffect(() => {
+    if (playing) return
+    const start = () => playAsGuestRef.current()
+    window.addEventListener(START_AS_GUEST_EVENT, start)
+    return () => window.removeEventListener(START_AS_GUEST_EVENT, start)
+  }, [playing])
 
   const saveProfile = async (nickname: string, avatar: string) => {
     const next = profileFrom({ uid: account!.uid, nickname, avatar }, savedRef.current)
