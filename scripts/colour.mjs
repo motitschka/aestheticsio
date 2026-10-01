@@ -126,7 +126,7 @@ export function kmeans(points, k = 8, iterations = 14) {
 
 /**
  * Turns an image palette into the app's colour tokens. Text, muted text and
- * the accent are nudged until they meet WCAG contrast (7, 4.5, 4.5).
+ * the accent are nudged until they meet contrast 7.5 (body) and 5 (everything else).
  */
 export const hexToLch = (h) => lch(rgbToOklab([1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16))))
 
@@ -151,19 +151,28 @@ export function themeColours(clusters, meanL, forceDark, accentHex) {
   const ah = accent[2]
   const C = Math.min(accent[1], 0.2)
 
+  // Every text colour is checked against every ground it can sit on, with a
+  // margin above WCAG AA (4.5) so a faint glow of the collage through the
+  // reading sheet can never pull it under.
+  const BODY = 7.5
+  const SMALL = 5
   let t
   if (!dark) {
     const bg = [0.955, tint, h]
     const surface = [0.99, Math.min(tint, 0.012), h]
     const surface2 = [0.915, Math.min(0.035, tint + 0.005), h]
-    const text = ensureContrast([0.24, 0.03, ah], [bg, surface, surface2], 7, -1)
-    const muted = ensureContrast([0.5, 0.03, ah], [bg, surface], 4.5, -1)
+    const accentSoft = [0.9, Math.min(0.08, C * 0.5 + 0.02), ah]
+    const goodSoft = [0.93, 0.05, 150]
+    const badSoft = [0.93, 0.04, 25]
+    const grounds = [bg, surface, surface2]
+    const text = ensureContrast([0.24, 0.03, ah], [...grounds, accentSoft], BODY, -1)
+    const muted = ensureContrast([0.5, 0.03, ah], grounds, SMALL, -1)
     // Bright accents (yellow, orange) keep their brightness and get dark text on them.
     let fill = [Math.min(Math.max(accent[0], 0.45), 0.8), C, ah]
     const darkInk = [0.2, 0.03, ah]
     const lightInk = [0.99, 0.005, ah]
     const onAccent = contrast(fill, lightInk) >= contrast(fill, darkInk) ? lightInk : darkInk
-    fill = ensureContrast(fill, [onAccent], 4.5, onAccent === lightInk ? -1 : 1)
+    fill = ensureContrast(fill, [onAccent], SMALL, onAccent === lightInk ? -1 : 1)
     t = {
       bg,
       surface,
@@ -173,21 +182,25 @@ export function themeColours(clusters, meanL, forceDark, accentHex) {
       muted,
       accent: fill,
       onAccent,
-      accentText: ensureContrast([Math.min(fill[0], 0.55), C, ah], [bg, surface, surface2], 4.5, -1),
-      accentSoft: [0.9, Math.min(0.08, C * 0.5 + 0.02), ah],
-      good: [0.52, 0.13, 150],
-      goodSoft: [0.93, 0.05, 150],
-      bad: [0.53, 0.17, 25],
-      badSoft: [0.93, 0.04, 25],
-      gold: [0.62, 0.12, 80],
+      accentText: ensureContrast([Math.min(fill[0], 0.55), C, ah], [...grounds, accentSoft], SMALL, -1),
+      accentSoft,
+      good: ensureContrast([0.52, 0.13, 150], [...grounds, goodSoft], SMALL, -1),
+      goodSoft,
+      bad: ensureContrast([0.53, 0.17, 25], [...grounds, badSoft], SMALL, -1),
+      badSoft,
+      gold: ensureContrast([0.62, 0.12, 80], grounds, SMALL, -1),
     }
   } else {
     const bg = [0.17, Math.min(tint, 0.04), h]
     const surface = [0.215, Math.min(tint, 0.035), h]
     const surface2 = [0.27, Math.min(tint + 0.005, 0.04), h]
-    const text = ensureContrast([0.95, 0.015, ah], [bg, surface, surface2], 7, 1)
-    const muted = ensureContrast([0.74, 0.03, ah], [bg, surface], 4.5, 1)
-    const fill = ensureContrast([Math.min(Math.max(accent[0], 0.68), 0.88), C, ah], [bg, surface], 4.5, 1)
+    const accentSoft = [0.32, Math.min(0.08, C * 0.6), ah]
+    const goodSoft = [0.3, 0.06, 150]
+    const badSoft = [0.3, 0.06, 25]
+    const grounds = [bg, surface, surface2]
+    const text = ensureContrast([0.95, 0.015, ah], [...grounds, accentSoft], BODY, 1)
+    const muted = ensureContrast([0.74, 0.03, ah], grounds, SMALL, 1)
+    const fill = ensureContrast([Math.min(Math.max(accent[0], 0.68), 0.88), C, ah], [...grounds, accentSoft], SMALL, 1)
     const onAccent = [0.17, 0.02, ah]
     t = {
       bg,
@@ -196,15 +209,15 @@ export function themeColours(clusters, meanL, forceDark, accentHex) {
       line: [0.33, Math.min(tint + 0.005, 0.04), h],
       text,
       muted,
-      accent: ensureContrast(fill, [onAccent], 4.5, 1),
+      accent: ensureContrast(fill, [onAccent], SMALL, 1),
       onAccent,
       accentText: fill,
-      accentSoft: [0.32, Math.min(0.08, C * 0.6), ah],
-      good: [0.76, 0.15, 150],
-      goodSoft: [0.3, 0.06, 150],
-      bad: [0.72, 0.16, 25],
-      badSoft: [0.3, 0.06, 25],
-      gold: [0.82, 0.13, 85],
+      accentSoft,
+      good: ensureContrast([0.76, 0.15, 150], [...grounds, goodSoft], SMALL, 1),
+      goodSoft,
+      bad: ensureContrast([0.72, 0.16, 25], [...grounds, badSoft], SMALL, 1),
+      badSoft,
+      gold: ensureContrast([0.82, 0.13, 85], grounds, SMALL, 1),
     }
   }
   const colours = Object.fromEntries(Object.entries(t).map(([k, v]) => [k, hex(v)]))

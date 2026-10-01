@@ -16,6 +16,9 @@ export interface ThemeColours {
   onAccent: string
   accentText: string
   accentSoft: string
+  /** glossy buttons: highlight and shade of the accent, both still readable under onAccent */
+  accentHi: string
+  accentLo: string
   good: string
   goodSoft: string
   bad: string
@@ -112,6 +115,8 @@ const VARS: Record<keyof ThemeColours, string> = {
   onAccent: '--on-accent',
   accentText: '--accent-text',
   accentSoft: '--accent-soft',
+  accentHi: '--accent-hi',
+  accentLo: '--accent-lo',
   good: '--good',
   goodSoft: '--good-soft',
   bad: '--bad',
@@ -120,6 +125,16 @@ const VARS: Record<keyof ThemeColours, string> = {
 }
 
 const EXTRA = ['--font', '--font-display', '--display-scale', '--glow', '--shadow', '--veil']
+
+/**
+ * Ornamental display faces (script, blackletter, grunge, inline). They stay on
+ * big titles and numbers; quiz prompts and lesson headings use the body face.
+ */
+const DECORATIVE = new Set([
+  'Bungee Inline', 'Creepster', 'Dancing Script', 'Great Vibes', 'Kaushan Script', 'Long Cang', 'Ma Shan Zheng',
+  'MedievalSharp', 'Metal Mania', 'Monoton', 'Pacifico', 'Pirata One', 'Rock Salt', 'Rubik Dirt', 'Rubik Glitch',
+  'Rubik Spray Paint', 'Saira Stencil One', 'Satisfy', 'Uncial Antiqua', 'UnifrakturMaguntia',
+])
 
 /** A lesson's theme unlocks when it's learned, and stays unlocked. */
 export const themeUnlocked = (e: Entry | undefined) => e?.u === 1 || (e?.lt ?? 0) >= 2
@@ -134,7 +149,7 @@ function fontsUrl(theme: Theme) {
 export function applyTheme(theme: Theme | null) {
   const root = document.documentElement
   for (const v of [...Object.values(VARS), ...EXTRA]) root.style.removeProperty(v)
-  for (const key of ['buttons', 'layout', 'icons', 'motion', 'pattern', 'caps', 'theme']) delete root.dataset[key]
+  for (const key of ['buttons', 'layout', 'icons', 'motion', 'pattern', 'caps', 'deco', 'theme']) delete root.dataset[key]
   root.style.removeProperty('color-scheme')
   document.getElementById('theme-fonts')?.remove()
   const meta = document.querySelectorAll<HTMLMetaElement>('meta[name="theme-color"]')
@@ -160,6 +175,7 @@ export function applyTheme(theme: Theme | null) {
   root.dataset.motion = theme.motion
   root.dataset.pattern = theme.pattern
   if (theme.caps) root.dataset.caps = ''
+  if (DECORATIVE.has(theme.font)) root.dataset.deco = ''
   root.dataset.theme = theme.id
   meta.forEach((m) => (m.content = theme.colours.bg))
 

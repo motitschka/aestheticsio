@@ -22,6 +22,20 @@
   letter-spacing: 0.03em;
 }
 
+/* Ornamental faces stay on big titles and numbers; the words you must read to
+   answer a question or follow a lesson switch to the body face. */
+:root[data-deco] .prompt strong {
+  font-family: var(--font);
+  font-weight: 700;
+  font-size: 1.3em;
+}
+
+:root[data-deco] .info-heading {
+  font-family: var(--font);
+  font-weight: 700;
+  font-size: 1.25rem;
+}
+
 /* ---------- motion ---------- */
 
 :root[data-theme] {
@@ -46,6 +60,55 @@
 /* Tilted cards and entrances must never cause sideways scrolling on a phone. */
 :root[data-theme] .app {
   overflow-x: clip;
+}
+
+/*
+ * The reading sheet. Nothing to read ever sits straight on the collage: each
+ * screen's content lies on a sheet of the theme's own ground, and the pins show
+ * around it (and only as a soft blur of colour through it).
+ */
+:root[data-theme] .page {
+  margin-inline: -8px;
+  padding: 18px 14px 22px;
+  background: color-mix(in srgb, var(--bg) 96%, transparent);
+  backdrop-filter: blur(18px);
+  border: 1px solid var(--line);
+  border-radius: calc(var(--radius) + 4px);
+  box-shadow: 0 18px 48px rgb(0 0 0 / 22%);
+}
+
+:root[data-theme] .page .sticky-actions {
+  margin: 0 -14px -22px;
+  padding-inline: 14px;
+  border-radius: 0 0 calc(var(--radius) + 4px) calc(var(--radius) + 4px);
+}
+
+:root[data-theme] .tabbar {
+  background: color-mix(in srgb, var(--surface) 96%, transparent);
+}
+
+/* the lesson's close button and title sit on their own strip of ground */
+:root[data-theme] .lesson-top {
+  margin-inline: -8px;
+  padding: 6px 16px 6px 6px;
+  background: color-mix(in srgb, var(--bg) 96%, transparent);
+  backdrop-filter: blur(18px);
+  border: 1px solid var(--line);
+  border-radius: calc(var(--radius) + 4px);
+}
+
+@media (min-width: 600px) {
+  :root[data-theme] .page {
+    margin-inline: -24px;
+    padding: 28px 24px 32px;
+  }
+
+  :root[data-theme] .page .sticky-actions {
+    margin: 0 -24px -32px;
+    padding-inline: 24px;
+  }
+
+  :root[data-theme] .lesson-top { margin-inline: -24px; }
 }
 
 :root[data-theme] :is(.btn, .choice, .image-choice, .mode-row, .theme-tile, .row) {
@@ -745,7 +808,8 @@
   --pill: 999px;
   --radius: 28px;
   --radius-sm: 20px;
-  --btn-shadow: inset 0 -6px 10px color-mix(in srgb, var(--accent) 65%, black), inset 0 6px 10px rgb(255 255 255 / 45%), 0 10px 22px color-mix(in srgb, var(--accent) 35%, transparent);
+  /* soft enough at the centre that the label keeps its contrast */
+  --btn-shadow: inset 0 -5px 8px var(--accent-lo), inset 0 5px 8px var(--accent-hi), 0 10px 22px color-mix(in srgb, var(--accent) 35%, transparent);
   --card-border: 0;
   --card-shadow: inset 0 -8px 16px rgb(0 0 0 / 6%), inset 0 8px 16px rgb(255 255 255 / 70%), 0 14px 30px rgb(0 0 0 / 9%);
 }
