@@ -17,14 +17,15 @@ interface SignInProps {
   onSignIn?(): void
   onGuest(): void
   error: string | null
+  total: number
 }
 
-export function SignIn({ onSignIn, onGuest, error }: SignInProps) {
+export function SignIn({ onSignIn, onGuest, error, total }: SignInProps) {
   return (
     <Screen>
       <p className="eyebrow">Aesthetic Learner</p>
       <h1 className="display gate-title">Learn to see every design aesthetic.</h1>
-      <p className="muted">From Art Deco to Y2K: 173 aesthetics from the Aesthetics Wiki, one quick round at a time.</p>
+      <p className="muted">From Art Deco to Y2K: {total} aesthetics from the Aesthetics Wiki, with a lesson for each and quick rounds to practise.</p>
       {onSignIn && (
         <button className="btn btn-primary btn-big" onClick={onSignIn}>
           Continue with Google

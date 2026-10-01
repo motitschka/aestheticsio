@@ -1,19 +1,22 @@
-import type { Progress } from '../types'
+import type { SavedProgress } from '../types'
+import { emptyStats, normalizeSaved } from './progress'
 
 // Guest play keeps progress in this browser only. When a guest signs in,
 // their progress is merged into the account and cleared here.
 const PROGRESS_KEY = 'aesthetics:guest-progress'
 const GUEST_KEY = 'aesthetics:guest'
 
-export function loadGuestProgress(): Progress {
+export function loadGuestProgress(): SavedProgress {
   try {
-    return JSON.parse(localStorage.getItem(PROGRESS_KEY) ?? '{}') as Progress
+    return normalizeSaved(JSON.parse(localStorage.getItem(PROGRESS_KEY) ?? '{}'))
   } catch {
-    return {}
+    return { items: {}, stats: emptyStats() }
   }
 }
 
-export function saveGuestProgress(progress: Progress) {
+export const hasGuestProgress = (p: SavedProgress) => Object.keys(p.items).length > 0 || p.stats.timelineTotal > 0 || p.stats.bestStreak > 0
+
+export function saveGuestProgress(progress: SavedProgress) {
   try {
     localStorage.setItem(PROGRESS_KEY, JSON.stringify(progress))
   } catch {

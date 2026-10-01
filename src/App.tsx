@@ -1,19 +1,39 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { createBackend, isDemo, NoAccessError, type Backend } from './backend'
+import type { ProgressPatch } from './backend/types'
+import type { ChallengeOutcome } from './components/Challenge'
 import { Message, NoAccess, SignIn, Splash } from './components/Gates'
 import { Leaderboard, LeaderboardSignIn } from './components/Leaderboard'
+import { Lesson } from './components/Lesson'
 import { Me } from './components/Me'
 import { Play } from './components/Play'
 import { ProfileEditor } from './components/ProfileEditor'
 import { ProgressView } from './components/ProgressView'
 import { loadAestheticsData } from './data'
-import { clearGuestProgress, loadGuestChoice, loadGuestProgress, saveGuestChoice, saveGuestProgress } from './lib/guest'
-import { applyAnswer, mergeProgress, rankProfiles, statsOf, type ModeSetting } from './lib/quiz'
-import { loadMode, saveMode } from './lib/settings'
-import type { AestheticsData, AppUser, Profile, Progress } from './types'
+import { formatTime } from './lib/format'
+import { clearGuestProgress, hasGuestProgress, loadGuestChoice, loadGuestProgress, saveGuestChoice, saveGuestProgress } from './lib/guest'
+import {
+  applyChallenge,
+  applyLesson,
+  applyPractice,
+  earnedBadges,
+  emptyStats,
+  lessonState,
+  mergeSaved,
+  MILESTONES,
+  profileFrom,
+  rankByStreak,
+  recognised,
+  type Milestone,
+} from './lib/progress'
+import type { Question } from './lib/questions'
+import type { AestheticsData, AppUser, PracticeMode, SavedProgress } from './types'
 
 type Tab = 'play' | 'progress' | 'ranks' | 'me'
 type Status = 'loading' | 'noAccess' | 'error' | 'ready'
+type Identity = { nickname: string; avatar: string }
+
+const emptySaved = (): SavedProgress => ({ items: {}, stats: emptyStats() })
 
 export default function App() {
   const [data, setData] = useState<AestheticsData | null>(null)
@@ -27,14 +47,15 @@ export default function App() {
   // Which account the loaded data belongs to, so switching accounts shows "loading".
   const [session, setSession] = useState<{ uid: string; status: Status } | null>(null)
   const [admin, setAdmin] = useState(false)
-  const [profile, setProfile] = useState<Profile | null>(null)
-  const [progress, setProgress] = useState<Progress>(() => (guest ? loadGuestProgress() : {}))
-  const progressRef = useRef(progress)
+  const [identity, setIdentity] = useState<Identity | null>(null)
+  const [saved, setSaved] = useState<SavedProgress>(() => (guest ? loadGuestProgress() : emptySaved()))
+  const savedRef = useRef(saved)
+  const [now, setNow] = useState(Date.now)
 
   const [tab, setTab] = useState<Tab>('play')
   const [inRound, setInRound] = useState(false)
+  const [lessonId, setLessonId] = useState<string | null>(null)
   const [editing, setEditing] = useState(false)
-  const [mode, setMode] = useState<ModeSetting>(loadMode)
   const [saveFailed, setSaveFailed] = useState(false)
 
   useEffect(() => {
@@ -53,27 +74,23 @@ export default function App() {
     ;(async () => {
       try {
         const [isAdmin, remote] = await Promise.all([backend.isAdmin(), backend.loadProgress(user.uid)])
-        let prog = remote
+        let progress = remote
         const guestProgress = loadGuestProgress()
-        const carried = Object.keys(guestProgress).length > 0
+        const carried = hasGuestProgress(guestProgress)
         if (carried) {
-          prog = mergeProgress(remote, guestProgress)
-          await backend.saveProgress(user.uid, prog)
+          progress = mergeSaved(remote, guestProgress)
+          await backend.saveProgress(user.uid, progress, null)
           clearGuestProgress()
         }
-        let p = await backend.loadProfile(user.uid)
-        if (p && carried) {
-          const stats = statsOf(prog)
-          await backend.saveProfile(user.uid, { nickname: p.nickname, avatar: p.avatar, ...stats })
-          p = { ...p, ...stats }
-        }
+        const p = await backend.loadProfile(user.uid)
+        if (p && carried) await backend.saveProfile(profileFrom(p, progress))
         if (cancelled) return
         saveGuestChoice(false)
         setGuest(false)
         setAdmin(isAdmin)
-        progressRef.current = prog
-        setProgress(prog)
-        setProfile(p)
+        savedRef.current = progress
+        setSaved(progress)
+        setIdentity(p ? { nickname: p.nickname, avatar: p.avatar } : null)
         setStatus('ready')
       } catch (err) {
         if (cancelled) return
@@ -90,36 +107,87 @@ export default function App() {
   const [avatarSeed] = useState(Math.random)
   const randomAvatar = aesthetics[Math.floor(avatarSeed * aesthetics.length)]?.id ?? ''
   const status: Status = session && account && session.uid === account.uid ? session.status : 'loading'
+  const profile = useMemo(() => (account && identity ? profileFrom({ uid: account.uid, ...identity }, saved) : null), [account, identity, saved])
 
-  const onAnswer = useCallback(
-    (id: string, correct: boolean) => {
-      const prev = progressRef.current[id]
-      const entry = applyAnswer(prev, correct, Date.now())
-      const next = { ...progressRef.current, [id]: entry }
-      progressRef.current = next
-      setProgress(next)
-      const stats = statsOf(next)
+  /** Applies a change locally and saves it (account or this browser). */
+  const commit = useCallback(
+    (next: SavedProgress, patch: ProgressPatch) => {
+      savedRef.current = next
+      setSaved(next)
+      setNow(Date.now())
       if (backend && account) {
-        setProfile((p) => p && { ...p, ...stats })
-        backend.saveAnswer(account.uid, id, entry, stats).then(
+        if (!identity) return
+        backend.saveProgress(account.uid, patch, profileFrom({ uid: account.uid, ...identity }, next)).then(
           () => setSaveFailed(false),
           () => setSaveFailed(true),
         )
       } else {
         saveGuestProgress(next)
       }
-      return entry.l && !prev?.l
     },
-    [backend, account],
+    [backend, account, identity],
+  )
+
+  const recordPractice = useCallback(
+    (mode: PracticeMode, q: Question, correct: boolean) => {
+      const s = savedRef.current
+      if (mode === 'timeline' || !('target' in q)) {
+        const stats = { ...s.stats, timelineRight: s.stats.timelineRight + (correct ? 1 : 0), timelineTotal: s.stats.timelineTotal + 1 }
+        commit({ ...s, stats }, { stats })
+        return false
+      }
+      const id = q.target.id
+      const prev = s.items[id]
+      const entry = applyPractice(prev, mode, correct, Date.now())
+      commit({ ...s, items: { ...s.items, [id]: entry } }, { items: { [id]: entry } })
+      return recognised(entry, mode) && !recognised(prev, mode)
+    },
+    [commit],
+  )
+
+  const recordLesson = useCallback(
+    (id: string, perfect: boolean) => {
+      const s = savedRef.current
+      const t = Date.now()
+      const prev = s.items[id]
+      const entry = applyLesson(prev, perfect, t)
+      commit({ ...s, items: { ...s.items, [id]: entry } }, { items: { [id]: entry } })
+      return { before: lessonState(prev, t), after: lessonState(entry, t) }
+    },
+    [commit],
+  )
+
+  const recordChallenge = useCallback(
+    (streak: number, splits: Partial<Record<Milestone, number>>): ChallengeOutcome => {
+      const s = savedRef.current
+      const before = s.stats
+      const after = applyChallenge(before, streak, splits)
+      const records: string[] = []
+      if (after.bestStreak > before.bestStreak) records.push(`Best streak: ${after.bestStreak}`)
+      for (const m of MILESTONES) {
+        const key = `best${m}` as const
+        if (after[key] !== undefined && after[key] !== before[key]) records.push(`Fastest ${m}: ${formatTime(after[key])}`)
+      }
+      const had = new Set(earnedBadges(before))
+      const newBadges = earnedBadges(after).filter((b) => !had.has(b))
+      if (records.length) commit({ ...s, stats: after }, { stats: after })
+      return { records, newBadges }
+    },
+    [commit],
   )
 
   const listProfiles = useCallback(() => backend!.listProfiles(), [backend])
 
-  const loadRank = useCallback(async () => {
-    const ranked = rankProfiles(await backend!.listProfiles())
+  const loadStreakRank = useCallback(async () => {
+    const ranked = rankByStreak(await backend!.listProfiles())
     const i = ranked.findIndex((p) => p.uid === account?.uid)
     return i < 0 ? null : { rank: i + 1, total: ranked.length }
   }, [backend, account])
+
+  const openLesson = useCallback((a: { id: string }) => {
+    setNow(Date.now())
+    setLessonId(a.id)
+  }, [])
 
   const signIn = async () => {
     setSignInError(null)
@@ -134,14 +202,15 @@ export default function App() {
     setTab('play')
     setInRound(false)
     setEditing(false)
+    setLessonId(null)
   }
 
   const signOut = () => {
     resetView()
     setSession(null)
-    setProfile(null)
-    progressRef.current = {}
-    setProgress({})
+    setIdentity(null)
+    savedRef.current = emptySaved()
+    setSaved(savedRef.current)
     backend?.signOut()
   }
 
@@ -149,22 +218,16 @@ export default function App() {
     if (account) backend?.signOut()
     resetView()
     saveGuestChoice(true)
-    const p = loadGuestProgress()
-    progressRef.current = p
-    setProgress(p)
+    savedRef.current = loadGuestProgress()
+    setSaved(savedRef.current)
     setGuest(true)
   }
 
   const saveProfile = async (nickname: string, avatar: string) => {
-    const stats = statsOf(progressRef.current)
-    await backend!.saveProfile(account!.uid, { nickname, avatar, ...stats })
-    setProfile({ uid: account!.uid, nickname, avatar, ...stats })
+    const next = profileFrom({ uid: account!.uid, nickname, avatar }, savedRef.current)
+    await backend!.saveProfile(next)
+    setIdentity({ nickname, avatar })
     setEditing(false)
-  }
-
-  const changeMode = (m: ModeSetting) => {
-    setMode(m)
-    saveMode(m)
   }
 
   if (dataFailed) {
@@ -198,77 +261,95 @@ export default function App() {
         />
       )
     }
-    if (!profile || editing) {
+    if (!identity || editing) {
       return (
         <main className="app">
           <ProfileEditor
             aesthetics={aesthetics}
-            initialNickname={profile?.nickname ?? (account.name.split(' ')[0] || account.email.split('@')[0])}
-            initialAvatar={profile?.avatar ?? randomAvatar}
-            heading={profile ? 'Edit profile' : 'Welcome!'}
-            intro={profile ? undefined : 'Pick a nickname and an aesthetic as your avatar. Friends see them on the leaderboard.'}
-            saveLabel={profile ? 'Save' : "Let's go"}
+            initialNickname={identity?.nickname ?? (account.name.split(' ')[0] || account.email.split('@')[0])}
+            initialAvatar={identity?.avatar ?? randomAvatar}
+            heading={identity ? 'Edit profile' : 'Welcome!'}
+            intro={identity ? undefined : 'Pick a nickname and an aesthetic as your avatar. Friends see them on the leaderboard.'}
+            saveLabel={identity ? 'Save' : "Let's go"}
             onSave={saveProfile}
-            onCancel={profile ? () => setEditing(false) : undefined}
+            onCancel={identity ? () => setEditing(false) : undefined}
           />
         </main>
       )
     }
   } else if (!guest) {
-    return <SignIn onSignIn={backend ? signIn : undefined} onGuest={playAsGuest} error={signInError} />
+    return <SignIn onSignIn={backend ? signIn : undefined} onGuest={playAsGuest} error={signInError} total={aesthetics.length} />
   }
 
-  const signedIn = account && profile ? { user: account, profile } : null
-  const showRanks = Boolean(backend)
+  const lesson = lessonId ? byId.get(lessonId) : undefined
+  const showTabs = !inRound && !lesson
 
   return (
-    <main className={`app ${inRound ? 'in-round' : 'has-tabs'}`}>
-      {isDemo && !inRound && <p className="demo-banner">Demo mode: data stays in this browser</p>}
-      {saveFailed && <p className="notice notice-top">Couldn't save your last answer. Check your connection.</p>}
-
-      {tab === 'play' && (
-        <Play
-          aesthetics={aesthetics}
-          progress={progress}
-          mode={mode}
-          nickname={signedIn?.profile.nickname}
-          onAnswer={onAnswer}
-          loadRank={signedIn ? loadRank : undefined}
-          onRoundActive={setInRound}
-        />
-      )}
-      {tab === 'progress' && <ProgressView aesthetics={aesthetics} progress={progress} />}
-      {tab === 'ranks' &&
-        (signedIn ? (
-          <Leaderboard byId={byId} total={aesthetics.length} me={signedIn.user.uid} load={listProfiles} />
-        ) : (
-          <LeaderboardSignIn onSignIn={signIn} error={signInError} />
-        ))}
-      {tab === 'me' && (
-        <Me
-          account={
-            signedIn && backend
-              ? {
-                  ...signedIn,
-                  avatar: byId.get(signedIn.profile.avatar),
-                  admin,
-                  backend,
-                  onEditProfile: () => setEditing(true),
-                  onSignOut: signOut,
-                }
-              : null
-          }
-          onSignIn={backend ? signIn : undefined}
-          mode={mode}
-          onMode={changeMode}
+    <main className={`app ${showTabs ? 'has-tabs' : 'in-round'}`}>
+      {lesson && (
+        <Lesson
+          key={lesson.id}
+          aesthetic={lesson}
+          all={aesthetics}
+          byId={byId}
+          entry={saved.items[lesson.id]}
+          state={lessonState(saved.items[lesson.id], now)}
+          onFinish={(perfect) => recordLesson(lesson.id, perfect)}
+          onClose={() => {
+            setLessonId(null)
+            window.scrollTo({ top: 0 })
+          }}
         />
       )}
 
-      {!inRound && (
+      {/* Kept mounted under a lesson so a practice round can carry on afterwards. */}
+      <div hidden={!!lesson}>
+        {isDemo && showTabs && <p className="demo-banner">Demo mode: data stays in this browser</p>}
+        {saveFailed && <p className="notice notice-top">Couldn't save your last answer. Check your connection.</p>}
+
+        <div hidden={tab !== 'play'}>
+          <Play
+            all={aesthetics}
+            byId={byId}
+            saved={saved}
+            now={now}
+            nickname={profile?.nickname}
+            onPractice={recordPractice}
+            onChallengeEnd={recordChallenge}
+            onLesson={openLesson}
+            loadStreakRank={profile ? loadStreakRank : undefined}
+            onRoundActive={setInRound}
+          />
+        </div>
+        {tab === 'progress' && <ProgressView aesthetics={aesthetics} items={saved.items} now={now} onLesson={openLesson} />}
+        {tab === 'ranks' &&
+          (profile ? <Leaderboard byId={byId} total={aesthetics.length} me={profile.uid} load={listProfiles} /> : <LeaderboardSignIn onSignIn={signIn} error={signInError} />)}
+        {tab === 'me' && (
+          <Me
+            account={
+              account && profile && backend
+                ? {
+                    user: account,
+                    profile,
+                    avatar: byId.get(profile.avatar),
+                    admin,
+                    backend,
+                    onEditProfile: () => setEditing(true),
+                    onSignOut: signOut,
+                  }
+                : null
+            }
+            onSignIn={backend ? signIn : undefined}
+            stats={saved.stats}
+          />
+        )}
+      </div>
+
+      {showTabs && (
         <nav className="tabbar">
           <TabButton id="play" label="Play" tab={tab} onTab={setTab} icon={<path d="M8 5.5v13l11-6.5z" />} />
-          <TabButton id="progress" label="Progress" tab={tab} onTab={setTab} icon={<path d="M5 19V11M12 19V5M19 19v-5" />} />
-          {showRanks && (
+          <TabButton id="progress" label="Lessons" tab={tab} onTab={setTab} icon={<path d="M4 5.5A2.5 2.5 0 0 1 6.5 3H20v15H6.5A2.5 2.5 0 0 0 4 20.5zM4 20.5A2.5 2.5 0 0 0 6.5 23H20v-5" />} />
+          {backend && (
             <TabButton id="ranks" label="Leaderboard" tab={tab} onTab={setTab} icon={<path d="M8 21h8M12 17v4M7 4h10v5a5 5 0 0 1-10 0zM7 6H4a3 3 0 0 0 3 4M17 6h3a3 3 0 0 1-3 4" />} />
           )}
           <TabButton id="me" label="Me" tab={tab} onTab={setTab} icon={<path d="M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM4 21a8 8 0 0 1 16 0" />} />

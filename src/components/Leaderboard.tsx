@@ -1,7 +1,9 @@
 import { useEffect, useState } from 'react'
-import { accuracy, rankProfiles } from '../lib/quiz'
+import { formatTime } from '../lib/format'
+import { accuracy, overallPercent, rankByLessons, rankByStreak } from '../lib/progress'
 import type { Aesthetic, Profile } from '../types'
 import { Avatar } from './Avatar'
+import { BadgeRow } from './Badges'
 
 interface Props {
   byId: Map<string, Aesthetic>
@@ -10,22 +12,37 @@ interface Props {
   load(): Promise<Profile[]>
 }
 
+type Board = 'lessons' | 'streak'
+
 export function Leaderboard({ byId, total, me, load }: Props) {
   const [profiles, setProfiles] = useState<Profile[] | null>(null)
   const [error, setError] = useState(false)
+  const [board, setBoard] = useState<Board>('lessons')
 
   useEffect(() => {
-    load().then((p) => setProfiles(rankProfiles(p)), () => setError(true))
+    load().then(setProfiles, () => setError(true))
   }, [load])
+
+  const ranked = profiles && (board === 'lessons' ? rankByLessons(profiles) : rankByStreak(profiles))
 
   return (
     <section className="page">
       <h1 className="title">Leaderboard</h1>
-      <p className="muted small">Ranked by aesthetics learned. Ties go to better accuracy.</p>
+      <div className="segmented" role="tablist">
+        <button role="tab" aria-selected={board === 'lessons'} className={board === 'lessons' ? 'on' : ''} onClick={() => setBoard('lessons')}>
+          Lessons %
+        </button>
+        <button role="tab" aria-selected={board === 'streak'} className={board === 'streak' ? 'on' : ''} onClick={() => setBoard('streak')}>
+          Best streak
+        </button>
+      </div>
+      <p className="muted small">
+        {board === 'lessons' ? 'Learned lessons count once, mastered twice. Ties go to better accuracy.' : 'Longest run in the Mixed challenge. Ties go to the fastest 25.'}
+      </p>
       {error && <p className="notice">Couldn't load the leaderboard. Check your connection.</p>}
       {!profiles && !error && <p className="muted">Loading…</p>}
       <ol className="list">
-        {profiles?.map((p, i) => (
+        {ranked?.map((p, i) => (
           <li key={p.uid} className={`list-item row ranked ${p.uid === me ? 'is-me' : ''}`}>
             <span className={`rank rank-${i + 1}`}>{i + 1}</span>
             <Avatar aesthetic={byId.get(p.avatar)} nickname={p.nickname} size={44} />
@@ -35,13 +52,17 @@ export function Leaderboard({ byId, total, me, load }: Props) {
                 {p.uid === me && <span className="muted"> (you)</span>}
               </span>
               <span className="muted small">
-                {p.answered ? `${Math.round(accuracy(p) * 100)}% accuracy` : 'No answers yet'}
+                {board === 'lessons'
+                  ? p.answered
+                    ? `${Math.round(accuracy(p) * 100)}% practice accuracy`
+                    : 'No practice yet'
+                  : p.best25 !== undefined
+                    ? `25 in ${formatTime(p.best25)}`
+                    : 'No 25 yet'}
               </span>
+              <BadgeRow stats={p} />
             </span>
-            <span className="score tabular">
-              {p.learned}
-              <span className="muted small">/{total}</span>
-            </span>
+            <span className="score tabular">{board === 'lessons' ? `${overallPercent(p.lessonPoints, total)}%` : p.bestStreak}</span>
           </li>
         ))}
       </ol>

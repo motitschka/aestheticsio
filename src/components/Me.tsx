@@ -1,14 +1,8 @@
 import type { Backend } from '../backend'
-import type { ModeSetting } from '../lib/quiz'
-import type { Aesthetic, AppUser, Profile } from '../types'
+import type { Aesthetic, AppUser, PlayerStats, Profile } from '../types'
 import { AllowlistEditor } from './Admin'
 import { Avatar } from './Avatar'
-
-const MODES: { id: ModeSetting; label: string }[] = [
-  { id: 'mixed', label: 'Mixed' },
-  { id: 'image-to-name', label: 'Image → name' },
-  { id: 'name-to-image', label: 'Name → image' },
-]
+import { BadgeShelf } from './Badges'
 
 interface Props {
   /** Signed-in account; null when playing as a guest. */
@@ -23,11 +17,10 @@ interface Props {
   } | null
   /** Shown to guests when sign-in is available. */
   onSignIn?(): void
-  mode: ModeSetting
-  onMode(m: ModeSetting): void
+  stats: PlayerStats
 }
 
-export function Me({ account, onSignIn, mode, onMode }: Props) {
+export function Me({ account, onSignIn, stats }: Props) {
   return (
     <section className="page">
       {account ? (
@@ -58,17 +51,7 @@ export function Me({ account, onSignIn, mode, onMode }: Props) {
         </div>
       )}
 
-      <div className="card">
-        <h2>Question type</h2>
-        <div className="segmented" role="radiogroup">
-          {MODES.map((m) => (
-            <button key={m.id} role="radio" aria-checked={mode === m.id} className={mode === m.id ? 'on' : ''} onClick={() => onMode(m.id)}>
-              {m.label}
-            </button>
-          ))}
-        </div>
-        <p className="muted small">Saved on this device.</p>
-      </div>
+      <BadgeShelf stats={stats} />
 
       {account?.admin && (
         <>

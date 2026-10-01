@@ -1,19 +1,29 @@
 # Aesthetic Learner
 
-A phone-friendly quiz for learning the 173 design aesthetics in
+A phone-friendly app for learning every design aesthetic in
 [Category:Design Aesthetics](https://aesthetics.fandom.com/wiki/Category:Design_Aesthetics)
 on the Aesthetics Wiki.
 
 **Play it:** https://motitschka.github.io/aestheticsio/
 
+- **Lessons:** one per aesthetic, built from the wiki (intro, gallery, motifs,
+  colours, decade, values, related aesthetics) with questions in between: type the
+  name, pick its colours, motifs and decade. Missed questions come back at the end.
+  After the first time you choose *info only* or *questions only*.
+  - **Seen** = finished, **learned** = every question right in one go,
+    **mastered** = perfect again at least 30 days later (permanent). Learned drops
+    back to seen after a mistake.
+  - Overall %: learned counts 1, mastered 2, so 100% = every lesson learned and
+    200% = every lesson mastered.
+- **Practice modes** (rounds of 10): image → name, name → image, description → name,
+  clues → name, tell them apart (related aesthetics), odd one out, timeline. An
+  aesthetic is *recognised* in a mode after 3 right in a row there.
+- **Mixed challenge:** every question type, endless until the first mistake, timed.
+  Badges for 10/25/50/100 in a row and for 25/50/100 in under 3/6/12 minutes.
 - **Play without signing in:** guest progress is saved in the browser.
 - **Or sign in with Google (invite only):** progress syncs across devices and you
-  join the friends leaderboard. Guest progress comes with you the first time you sign in.
-- **Two question types:** one image with four names, or one name with four images.
-  Rounds have 10 questions and mix both types by default.
-- **Learned** = 3 right in a row; a wrong answer resets it. Each round re-checks
-  2 learned aesthetics, brings in at least 3 new ones, and fills the rest with
-  ones you're still learning.
+  join the friends leaderboard (lessons % and best streak). Guest progress comes
+  with you the first time you sign in.
 - **Stack:** Vite + React + TypeScript on GitHub Pages; Firebase Auth (Google) and
   Firestore on the free Spark plan for sign-in, sync and the leaderboard. Images
   load directly from Fandom.

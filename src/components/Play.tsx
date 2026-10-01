@@ -1,309 +1,172 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { preload, SIZE } from '../lib/images'
-import { buildRound, shuffle, statsOf, statusOf, type ModeSetting, type Question } from '../lib/quiz'
-import type { Aesthetic, Progress } from '../types'
-import { Photo } from './Photo'
-
-interface Answer {
-  target: Aesthetic
-  correct: boolean
-  learnedNow: boolean
-}
+import { useMemo, useState } from 'react'
+import { formatTime } from '../lib/format'
+import { lessonPoints, lessonState, overallPercent, recognised, type Milestone } from '../lib/progress'
+import { buildRound, eligible, MODE_INFO, PRACTICE_MODES, type Question } from '../lib/questions'
+import type { Aesthetic, PracticeMode, SavedProgress } from '../types'
+import { Avatar } from './Avatar'
+import { BadgeRow } from './Badges'
+import { Challenge, type ChallengeOutcome } from './Challenge'
+import { PracticeRound } from './PracticeRound'
+import { StateBadge } from './StateBadge'
 
 interface Props {
-  aesthetics: Aesthetic[]
-  progress: Progress
-  mode: ModeSetting
+  all: Aesthetic[]
+  byId: Map<string, Aesthetic>
+  saved: SavedProgress
+  now: number
   /** undefined for guests */
   nickname?: string
-  /** Records an answer; returns whether it just became learned. */
-  onAnswer(aestheticId: string, correct: boolean): boolean
+  /** Records a practice answer; returns whether the aesthetic just became recognised in that mode. */
+  onPractice(mode: PracticeMode, q: Question, correct: boolean): boolean
+  onChallengeEnd(streak: number, splits: Partial<Record<Milestone, number>>): ChallengeOutcome
+  onLesson(a: Aesthetic): void
   /** undefined for guests, who aren't on the leaderboard */
-  loadRank?(): Promise<{ rank: number; total: number } | null>
+  loadStreakRank?(): Promise<{ rank: number; total: number } | null>
   onRoundActive(active: boolean): void
 }
 
-const MODE_LABEL: Record<ModeSetting, string> = {
-  mixed: 'Mixed questions',
-  'image-to-name': 'Image → name',
-  'name-to-image': 'Name → image',
-}
+type View = { k: 'hub' } | { k: 'round'; mode: PracticeMode; questions: Question[]; n: number } | { k: 'challenge'; n: number }
 
-export function Play({ aesthetics, progress, mode, nickname, onAnswer, loadRank, onRoundActive }: Props) {
-  const [round, setRound] = useState<Question[] | null>(null)
-  const [answers, setAnswers] = useState<Answer[] | null>(null)
+export function Play({ all, byId, saved, now, nickname, onPractice, onChallengeEnd, onLesson, loadStreakRank, onRoundActive }: Props) {
+  const [view, setView] = useState<View>({ k: 'hub' })
+  const [seed] = useState(Math.random)
 
-  const start = () => {
-    const questions = buildRound(aesthetics, progress, mode)
-    preload([questions[0].image, ...questions[0].options.map((o) => o.image)], SIZE.medium)
-    setAnswers(null)
-    setRound(questions)
+  const scores = useMemo(() => {
+    const out = {} as Record<PracticeMode, { done: number; of: number; label: string }>
+    for (const mode of PRACTICE_MODES) {
+      if (mode === 'timeline') {
+        const { timelineRight: r, timelineTotal: t } = saved.stats
+        out[mode] = { done: r, of: t, label: t ? `${r}/${t} right` : 'Not played yet' }
+      } else {
+        const pool = all.filter((a) => eligible(mode, a, byId))
+        const done = pool.filter((a) => recognised(saved.items[a.id], mode)).length
+        out[mode] = { done, of: pool.length, label: `${done}/${pool.length} recognised` }
+      }
+    }
+    return out
+  }, [all, byId, saved])
+
+  // Suggest a lesson: ready to master first, then seen, then a new one.
+  const nextLesson = useMemo(() => {
+    const by = (state: string) => all.filter((a) => lessonState(saved.items[a.id], now) === state)
+    const ready = by('ready')
+    if (ready.length) return ready[0]
+    const seen = by('seen')
+    if (seen.length) return seen[0]
+    const fresh = by('new')
+    return fresh[Math.floor(seed * fresh.length)] ?? null
+  }, [all, saved, now, seed])
+
+  const start = (mode: PracticeMode) => {
+    const questions = buildRound(mode, all, byId, saved.items)
+    setView((v) => ({ k: 'round', mode, questions, n: v.k === 'round' ? v.n + 1 : 0 }))
     onRoundActive(true)
   }
-
-  const finish = (result: Answer[] | null) => {
-    setRound(null)
-    setAnswers(result)
+  const startChallenge = () => {
+    setView((v) => ({ k: 'challenge', n: v.k === 'challenge' ? v.n + 1 : 0 }))
+    onRoundActive(true)
+  }
+  const exit = () => {
+    setView({ k: 'hub' })
     onRoundActive(false)
+    window.scrollTo({ top: 0 })
   }
 
-  if (round) return <QuizView questions={round} onAnswer={onAnswer} onFinish={finish} />
-  if (answers) return <Results answers={answers} progress={progress} total={aesthetics.length} loadRank={loadRank} onAgain={start} onDone={() => setAnswers(null)} />
+  if (view.k === 'round') {
+    return (
+      <PracticeRound
+        key={view.n}
+        mode={view.mode}
+        questions={view.questions}
+        onAnswer={(q, correct) => onPractice(view.mode, q, correct)}
+        onLesson={onLesson}
+        score={scores[view.mode].label}
+        onAgain={() => start(view.mode)}
+        onExit={exit}
+      />
+    )
+  }
+  if (view.k === 'challenge') {
+    return <Challenge key={view.n} all={all} byId={byId} onEnd={onChallengeEnd} onLesson={onLesson} loadRank={loadStreakRank} onAgain={startChallenge} onExit={exit} />
+  }
 
-  const stats = statsOf(progress)
-  const learning = aesthetics.filter((a) => statusOf(progress[a.id]) === 'learning').length
-  const pct = (stats.learned / aesthetics.length) * 100
+  const points = lessonPoints(saved.items)
+  const pct = overallPercent(points, all.length)
+  const counts = { learned: 0, mastered: 0, seen: 0 }
+  for (const a of all) {
+    const s = lessonState(saved.items[a.id], now)
+    if (s === 'learned' || s === 'ready') counts.learned++
+    else if (s === 'mastered') counts.mastered++
+    else if (s === 'seen') counts.seen++
+  }
+  const { stats } = saved
 
   return (
     <section className="page start">
       <p className="eyebrow">{nickname ? `Hi ${nickname}` : 'Welcome'}</p>
       <h1 className="display">
-        {stats.learned}
-        <span className="display-of"> / {aesthetics.length}</span>
+        {pct}
+        <span className="display-of">%</span>
       </h1>
-      <p className="muted">design aesthetics learned</p>
-      <div className="bar" aria-hidden>
-        <div className="bar-fill" style={{ width: `${pct}%` }} />
+      <div className="bar bar-200" aria-hidden>
+        <div className="bar-fill" style={{ width: `${Math.min(pct, 200) / 2}%` }} />
       </div>
       <p className="muted small">
-        {learning} in progress · {aesthetics.length - stats.learned - learning} not seen yet
+        {counts.learned} learned · {counts.mastered} mastered · {counts.seen} seen. Learning every lesson is 100%, mastering every one is
+        200%.
       </p>
-      <button className="btn btn-primary btn-big" onClick={start}>
-        {stats.answered ? 'Start a round' : 'Start your first round'}
-      </button>
-      <p className="muted small center">
-        10 questions · {MODE_LABEL[mode]} · an aesthetic is learned after 3 right in a row
-      </p>
-    </section>
-  )
-}
 
-function QuizView({ questions, onAnswer, onFinish }: { questions: Question[]; onAnswer: Props['onAnswer']; onFinish(a: Answer[] | null): void }) {
-  const [index, setIndex] = useState(0)
-  const [picked, setPicked] = useState<string | null>(null)
-  const [answers, setAnswers] = useState<Answer[]>([])
-  const timer = useRef<number | undefined>(undefined)
-  const nextBtn = useRef<HTMLButtonElement>(null)
-
-  const q = questions[index]
-  const answered = picked !== null
-  const correct = picked === q.target.id
-
-  const pickedName = q.options.find((o) => o.aesthetic.id === picked)?.aesthetic.name
-  const more = useMemo(() => shuffle(q.target.images.filter((i) => i !== q.image)).slice(0, 3), [q])
-
-  useEffect(() => {
-    const next = questions[index + 1]
-    if (next) preload([next.image, ...next.options.map((o) => o.image)], next.mode === 'image-to-name' ? SIZE.large : SIZE.medium)
-  }, [questions, index])
-
-  useEffect(() => () => window.clearTimeout(timer.current), [])
-
-  const next = useCallback(() => {
-    window.clearTimeout(timer.current)
-    if (index + 1 >= questions.length) {
-      onFinish(answers)
-    } else {
-      setIndex(index + 1)
-      setPicked(null)
-      window.scrollTo({ top: 0 })
-    }
-  }, [answers, index, onFinish, questions.length])
-
-  const pick = useCallback(
-    (id: string) => {
-      if (picked !== null) return
-      const isRight = id === q.target.id
-      const learnedNow = onAnswer(q.target.id, isRight)
-      setPicked(id)
-      setAnswers((a) => [...a, { target: q.target, correct: isRight, learnedNow }])
-    },
-    [onAnswer, picked, q],
-  )
-
-  // Correct answers move on by themselves; wrong ones wait for "Next".
-  useEffect(() => {
-    if (!answered) return
-    if (correct) {
-      timer.current = window.setTimeout(next, 900)
-      return () => window.clearTimeout(timer.current)
-    }
-    nextBtn.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
-  }, [answered, correct, next])
-
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      const n = Number(e.key)
-      if (n >= 1 && n <= q.options.length) pick(q.options[n - 1].aesthetic.id)
-      else if (e.key === 'Enter' && answered) next()
-    }
-    window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
-  }, [answered, next, pick, q.options])
-
-  const optionState = (id: string) => {
-    if (!answered) return ''
-    if (id === q.target.id) return 'is-right'
-    if (id === picked) return 'is-wrong'
-    return 'is-dim'
-  }
-
-  return (
-    <section className="page quiz">
-      <div className="quiz-top">
-        <button className="icon-btn" onClick={() => onFinish(answers.length ? answers : null)} aria-label="End round">
-          ✕
+      {nextLesson && (
+        <button className="card next-lesson" onClick={() => onLesson(nextLesson)}>
+          <Avatar aesthetic={nextLesson} nickname={nextLesson.name} size={56} />
+          <span className="row-main">
+            <span className="muted small">Next lesson</span>
+            <span className="row-name">{nextLesson.name}</span>
+          </span>
+          <StateBadge state={lessonState(saved.items[nextLesson.id], now)} />
         </button>
-        <div className="bar bar-thin" aria-hidden>
-          <div className="bar-fill" style={{ width: `${((index + (answered ? 1 : 0)) / questions.length) * 100}%` }} />
-        </div>
-        <span className="muted small tabular">
-          {index + 1}/{questions.length}
-        </span>
-      </div>
-
-      {q.mode === 'image-to-name' ? (
-        <>
-          <p className="prompt">Which aesthetic is this?</p>
-          <Photo key={q.image} src={q.image} width={SIZE.large} alt="Mystery aesthetic" fit="contain" className="quiz-image" />
-          <div className="choices">
-            {q.options.map((o, i) => (
-              <button key={o.aesthetic.id} className={`choice ${optionState(o.aesthetic.id)}`} onClick={() => pick(o.aesthetic.id)} disabled={answered}>
-                <span className="choice-key">{i + 1}</span>
-                {o.aesthetic.name}
-              </button>
-            ))}
-          </div>
-        </>
-      ) : (
-        <>
-          <p className="prompt">
-            Which one is <strong>{q.target.name}?</strong>
-          </p>
-          <div className="image-choices">
-            {q.options.map((o, i) => (
-              <button key={o.aesthetic.id} className={`image-choice ${optionState(o.aesthetic.id)}`} onClick={() => pick(o.aesthetic.id)} disabled={answered} aria-label={`Option ${i + 1}`}>
-                <Photo key={o.image} src={o.image} width={SIZE.medium} alt={answered ? o.aesthetic.name : `Option ${i + 1}`} />
-                {answered && <span className="image-label">{o.aesthetic.name}</span>}
-              </button>
-            ))}
-          </div>
-        </>
       )}
 
-      {answered && correct && <p className="feedback feedback-right">Correct!</p>}
-
-      {answered && !correct && (
-        <div className="feedback-panel">
-          <p className="feedback feedback-wrong">
-            {q.mode === 'image-to-name' ? (
-              <>
-                Not quite. This is <strong>{q.target.name}</strong>, not {pickedName}.
-              </>
-            ) : (
-              <>
-                Not quite. You picked {pickedName}; <strong>{q.target.name}</strong> is highlighted in green.
-              </>
-            )}
-          </p>
-          {more.length > 0 && (
-            <>
-              <p className="muted small">More {q.target.name}:</p>
-              <div className="more-images">
-                {more.map((src) => (
-                  <Photo key={src} src={src} width={SIZE.medium} alt={q.target.name} />
-                ))}
-              </div>
-            </>
-          )}
-          <a className="link" href={q.target.wiki} target="_blank" rel="noreferrer">
-            Read about {q.target.name} on the Aesthetics Wiki ↗
-          </a>
-          <button ref={nextBtn} className="btn btn-primary" onClick={next}>
-            {index + 1 >= questions.length ? 'See results' : 'Next'}
-          </button>
-        </div>
-      )}
-    </section>
-  )
-}
-
-function Results({ answers, progress, total, loadRank, onAgain, onDone }: {
-  answers: Answer[]
-  progress: Progress
-  total: number
-  loadRank: Props['loadRank']
-  onAgain(): void
-  onDone(): void
-}) {
-  const [rank, setRank] = useState<{ rank: number; total: number } | null>(null)
-  useEffect(() => {
-    loadRank?.().then(setRank, () => setRank(null))
-  }, [loadRank])
-
-  const right = answers.filter((a) => a.correct).length
-  const learned = answers.filter((a) => a.learnedNow)
-  const missed = answers.filter((a) => !a.correct)
-  const stats = statsOf(progress)
-
-  return (
-    <section className="page results">
-      <p className="eyebrow">Round done</p>
-      <h1 className="display">
-        {right}
-        <span className="display-of"> / {answers.length}</span>
-      </h1>
-      <p className="muted">correct</p>
-
-      {learned.length > 0 && (
-        <div className="card">
-          <h2>Newly learned</h2>
-          <ul className="chips">
-            {learned.map((a) => (
-              <li key={a.target.id} className="chip chip-good">
-                {a.target.name}
-              </li>
-            ))}
-          </ul>
-        </div>
-      )}
-
-      {missed.length > 0 && (
-        <div className="card">
-          <h2>Look at these again</h2>
-          <ul className="chips">
-            {missed.map((a) => (
-              <li key={a.target.id}>
-                <a className="chip" href={a.target.wiki} target="_blank" rel="noreferrer">
-                  {a.target.name} ↗
-                </a>
-              </li>
-            ))}
-          </ul>
-        </div>
-      )}
-
-      <div className="card stat-row">
+      <div className="card challenge-card">
         <div>
-          <strong className="tabular">
-            {stats.learned}/{total}
-          </strong>
-          <span className="muted small">learned overall</span>
+          <h2>Mixed challenge</h2>
+          <p className="muted small">Every question type, against the clock. Keep going until your first mistake.</p>
         </div>
-        {loadRank && (
-          <div>
-            <strong className="tabular">{rank ? `#${rank.rank}` : '–'}</strong>
-            <span className="muted small">{rank ? `of ${rank.total} on the leaderboard` : 'leaderboard rank'}</span>
-          </div>
-        )}
+        <p className="small">
+          Best: <strong>{stats.bestStreak}</strong> in a row
+          {stats.best25 !== undefined && <> · fastest 25 in {formatTime(stats.best25)}</>}
+        </p>
+        <BadgeRow stats={stats} />
+        <button className="btn btn-primary" onClick={startChallenge}>
+          Start challenge
+        </button>
       </div>
 
-      <button className="btn btn-primary btn-big" onClick={onAgain}>
-        Play another round
-      </button>
-      <button className="btn btn-ghost" onClick={onDone}>
-        Done
-      </button>
+      <h2 className="section-title">Practice</h2>
+      <ul className="mode-list">
+        {PRACTICE_MODES.map((mode) => {
+          const s = scores[mode]
+          return (
+            <li key={mode}>
+              <button className="mode-row" onClick={() => start(mode)}>
+                <span className="row-main">
+                  <span className="row-name">{MODE_INFO[mode].title}</span>
+                  <span className="muted small">{MODE_INFO[mode].blurb}</span>
+                </span>
+                <span className="mode-score">
+                  <span className="small tabular">{s.label}</span>
+                  {s.of > 0 && (
+                    <span className="bar bar-mini" aria-hidden>
+                      <span className="bar-fill" style={{ width: `${(s.done / s.of) * 100}%` }} />
+                    </span>
+                  )}
+                </span>
+              </button>
+            </li>
+          )
+        })}
+      </ul>
+      <p className="muted small center">An aesthetic counts as recognised in a mode after 3 right in a row there.</p>
     </section>
   )
 }

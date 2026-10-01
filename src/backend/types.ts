@@ -1,10 +1,16 @@
-import type { AppUser, Entry, Profile, Progress, Stats } from '../types'
+import type { AppUser, PlayerStats, Profile, Progress, SavedProgress } from '../types'
 
 /** Thrown when the signed-in account isn't on the allowlist. */
 export class NoAccessError extends Error {
   constructor() {
     super('This account is not on the allowlist')
   }
+}
+
+export interface ProgressPatch {
+  /** Changed entries only; merged into what's stored. */
+  items?: Progress
+  stats?: PlayerStats
 }
 
 export interface Backend {
@@ -16,13 +22,12 @@ export interface Backend {
   isAdmin(): Promise<boolean>
 
   loadProfile(uid: string): Promise<Profile | null>
-  saveProfile(uid: string, profile: Pick<Profile, 'nickname' | 'avatar'> & Stats): Promise<void>
+  /** Replaces the whole profile document. */
+  saveProfile(profile: Profile): Promise<void>
   /** Throws NoAccessError when the account isn't allowlisted. */
-  loadProgress(uid: string): Promise<Progress>
-  /** Writes many entries at once (used to carry guest progress into an account). */
-  saveProgress(uid: string, progress: Progress): Promise<void>
-  /** Saves one answer and the updated leaderboard stats together. */
-  saveAnswer(uid: string, aestheticId: string, entry: Entry, stats: Stats): Promise<void>
+  loadProgress(uid: string): Promise<SavedProgress>
+  /** Saves progress changes and, when given, the updated leaderboard profile, together. */
+  saveProgress(uid: string, patch: ProgressPatch, profile: Profile | null): Promise<void>
   listProfiles(): Promise<Profile[]>
 
   getAllowlist(): Promise<string[]>

@@ -309,6 +309,11 @@ h2 {
   box-shadow: var(--shadow);
 }
 
+.segmented-tight button {
+  padding: 0 6px;
+  font-size: 0.8rem;
+}
+
 .segmented .count {
   font-weight: 500;
   opacity: 0.7;
@@ -488,7 +493,9 @@ h2 {
 }
 
 .stat-row {
-  flex-direction: row;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(60px, 1fr));
+  gap: 12px;
 }
 
 .stat-row > div {
@@ -501,7 +508,8 @@ h2 {
 .stat-row strong {
   font-family: var(--font-display);
   font-weight: 400;
-  font-size: 2rem;
+  font-size: 1.8rem;
+  line-height: 1.1;
 }
 
 /* ---------- quiz ---------- */
@@ -935,6 +943,437 @@ button.row {
 
 .tabbar button.on {
   color: var(--accent);
+}
+
+/* ---------- questions ---------- */
+
+.question {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.description {
+  margin: 0;
+  padding: 14px 16px;
+  border-left: 3px solid var(--accent);
+  border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+  background: var(--surface);
+  line-height: 1.55;
+}
+
+.blank {
+  display: inline-block;
+  width: 3.2em;
+  height: 0.9em;
+  margin: 0 2px;
+  vertical-align: -0.05em;
+  border-radius: 4px;
+  background: var(--accent-soft);
+  border-bottom: 2px solid var(--accent);
+}
+
+.clues {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+}
+
+.clues > div {
+  display: grid;
+  grid-template-columns: 76px 1fr;
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  border: 1px solid var(--line);
+}
+
+.clues dt {
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--muted);
+  padding-top: 2px;
+}
+
+.clues dd {
+  margin: 0;
+  line-height: 1.4;
+}
+
+.type-form {
+  display: flex;
+  gap: 8px;
+}
+
+.type-form.is-right .input {
+  border-color: var(--good);
+  background: var(--good-soft);
+}
+
+.type-form.is-wrong .input {
+  border-color: var(--bad);
+  background: var(--bad-soft);
+}
+
+.feedback-panel.is-good {
+  border-color: var(--good);
+}
+
+.feedback-links {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 16px;
+}
+
+.timeline {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.timeline-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 8px 12px 8px 8px;
+  border: 1.5px solid var(--line);
+  border-radius: 14px;
+  background: var(--surface);
+  text-align: left;
+  cursor: pointer;
+}
+
+.timeline-item:disabled {
+  cursor: default;
+}
+
+.timeline-item.is-picked {
+  border-color: var(--accent);
+}
+
+.timeline-pos {
+  flex: none;
+  width: 30px;
+  height: 30px;
+  display: grid;
+  place-items: center;
+  border-radius: 999px;
+  background: var(--surface-2);
+  font-weight: 700;
+}
+
+.is-picked .timeline-pos {
+  background: var(--accent);
+  color: var(--on-accent);
+}
+
+.timeline-thumb {
+  flex: none;
+  width: 48px;
+  height: 48px;
+  border-radius: 10px;
+}
+
+.timeline-actions {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+/* ---------- lessons ---------- */
+
+.lesson-screen {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.lesson-top {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.lesson-title {
+  font-weight: 650;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.lesson-hero {
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  border-radius: var(--radius);
+}
+
+.lesson-status {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+}
+
+.info-card {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.info-heading {
+  font-family: var(--font-display);
+  font-weight: 400;
+  font-size: 1.6rem;
+  line-height: 1.1;
+}
+
+.info-text {
+  line-height: 1.6;
+}
+
+.gallery-2 {
+  grid-template-columns: 1fr 1fr;
+}
+
+.fact-list {
+  margin: 0;
+  padding-left: 20px;
+  line-height: 1.6;
+}
+
+.colour-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.swatch {
+  width: 14px;
+  height: 14px;
+  border-radius: 999px;
+  box-shadow: inset 0 0 0 1px rgb(0 0 0 / 15%);
+}
+
+.related-list {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.related-list li {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-weight: 550;
+}
+
+.lesson-done {
+  align-items: center;
+  padding-top: 32px;
+}
+
+.lesson-done .btn {
+  align-self: stretch;
+}
+
+.state-new {
+  background: var(--surface-2);
+  color: var(--muted);
+}
+
+.state-seen {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+.state-learned {
+  background: var(--good-soft);
+  color: var(--good);
+}
+
+.state-ready {
+  background: var(--good);
+  color: var(--surface);
+}
+
+.state-mastered {
+  background: var(--gold);
+  color: var(--surface);
+}
+
+/* ---------- play hub ---------- */
+
+.bar-200 {
+  position: relative;
+}
+
+/* marks 100% (every lesson learned) halfway along */
+.bar-200::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 50%;
+  width: 2px;
+  background: var(--bg);
+}
+
+.next-lesson {
+  flex-direction: row;
+  align-items: center;
+  width: 100%;
+  text-align: left;
+  cursor: pointer;
+  font: inherit;
+  color: inherit;
+}
+
+.challenge-card h2 {
+  margin-bottom: 2px;
+}
+
+.mode-list {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.mode-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface);
+  text-align: left;
+  cursor: pointer;
+}
+
+.mode-row:hover {
+  border-color: var(--accent);
+}
+
+.mode-score {
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 6px;
+  color: var(--muted);
+}
+
+.bar-mini {
+  display: block;
+  width: 72px;
+  height: 4px;
+}
+
+.chip-button {
+  border: 0;
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.9rem;
+}
+
+.challenge-streak {
+  flex: 1;
+  font-size: 0.95rem;
+}
+
+.challenge-streak strong {
+  font-family: var(--font-display);
+  font-weight: 400;
+  font-size: 1.6rem;
+}
+
+.challenge-timer {
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: var(--surface-2);
+  font-weight: 600;
+}
+
+/* ---------- badges ---------- */
+
+.badge-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.badge-icon {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 3px 8px 3px 6px;
+  border-radius: 999px;
+  background: var(--surface-2);
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+
+.badge-icon.is-small {
+  padding: 1px 6px 1px 4px;
+  font-size: 0.68rem;
+}
+
+.badge-icon.is-streak.is-earned {
+  background: #fde7d6;
+  color: #c2410c;
+}
+
+.badge-icon.is-speed.is-earned {
+  background: #fdf3c7;
+  color: #a16207;
+}
+
+@media (prefers-color-scheme: dark) {
+  .badge-icon.is-streak.is-earned {
+    background: #43251a;
+    color: #fb9a6a;
+  }
+
+  .badge-icon.is-speed.is-earned {
+    background: #3f3415;
+    color: #f5c94a;
+  }
+}
+
+.badge-list {
+  display: grid;
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.badge-list li {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.badge-list li > span:last-child {
+  display: flex;
+  flex-direction: column;
+}
+
+.badge-list li.is-locked {
+  opacity: 0.55;
 }
 
 @media (prefers-reduced-motion: reduce) {

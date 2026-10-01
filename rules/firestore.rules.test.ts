@@ -22,7 +22,7 @@ const owner = () => as('owner', OWNER)
 const friend = () => as('friend', FRIEND)
 const stranger = () => as('stranger', 'stranger@example.com')
 
-const profile = { nickname: 'Fr', avatar: 'art-deco', learned: 1, correct: 3, answered: 4 }
+const profile = { nickname: 'Fr', avatar: 'art-deco', lessonPoints: 3, bestStreak: 12, best25: 170000, correct: 3, answered: 4 }
 
 beforeAll(async () => {
   env = await initializeTestEnvironment({ projectId: 'demo-aesthetics', firestore: { rules, host: '127.0.0.1', port: 8080 } })
@@ -73,6 +73,8 @@ describe('allowlisted friends', () => {
     await assertSucceeds(setDoc(doc(friend(), 'progress/friend'), { items: { 'art-deco': { s: 1, l: false, c: 1, w: 0, t: 1 } } }))
     await assertSucceeds(getDoc(doc(friend(), 'progress/friend')))
     await assertSucceeds(setDoc(doc(friend(), 'profiles/friend'), profile))
+    const { best25: _, ...noTimes } = profile
+    await assertSucceeds(setDoc(doc(friend(), 'profiles/friend'), noTimes))
   })
 
   it("can't touch someone else's progress or profile", async () => {
@@ -87,7 +89,9 @@ describe('allowlisted friends', () => {
     await assertFails(setDoc(doc(db, 'profiles/friend'), { ...profile, nickname: 'x'.repeat(25) }))
     await assertFails(setDoc(doc(db, 'profiles/friend'), { ...profile, correct: 5, answered: 4 }))
     await assertFails(setDoc(doc(db, 'profiles/friend'), { ...profile, isAdmin: true }))
-    await assertFails(setDoc(doc(db, 'profiles/friend'), { ...profile, learned: 1.5 }))
+    await assertFails(setDoc(doc(db, 'profiles/friend'), { ...profile, lessonPoints: 1.5 }))
+    await assertFails(setDoc(doc(db, 'profiles/friend'), { ...profile, best25: 0 }))
+    await assertFails(setDoc(doc(db, 'profiles/friend'), { ...profile, learned: 3 }))
   })
 
   it("can't read or change the allowlist", async () => {

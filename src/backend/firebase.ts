@@ -22,7 +22,8 @@ import {
   setDoc,
   writeBatch,
 } from 'firebase/firestore'
-import type { Profile, Progress } from '../types'
+import { normalizeSaved } from '../lib/progress'
+import type { Profile } from '../types'
 import { NoAccessError, type Backend } from './types'
 
 const env = import.meta.env
@@ -37,7 +38,10 @@ export function createFirebaseBackend(): Backend {
     appId: env.VITE_FIREBASE_APP_ID,
   })
   const auth = getAuth(app)
-  const db = initializeFirestore(app, { localCache: persistentLocalCache({ tabManager: persistentMultipleTabManager() }) })
+  const db = initializeFirestore(app, {
+    localCache: persistentLocalCache({ tabManager: persistentMultipleTabManager() }),
+    ignoreUndefinedProperties: true,
+  })
   if (env.VITE_USE_EMULATORS === 'true') {
     connectAuthEmulator(auth, 'http://127.0.0.1:9099', { disableWarnings: true })
     connectFirestoreEmulator(db, '127.0.0.1', 8080)
@@ -85,28 +89,24 @@ export function createFirebaseBackend(): Backend {
       return snap.exists() ? toProfile(uid, snap.data()) : null
     },
 
-    async saveProfile(uid, p) {
-      await setDoc(doc(db, 'profiles', uid), { ...p, updatedAt: serverTimestamp() })
+    async saveProfile(profile) {
+      await setDoc(doc(db, 'profiles', profile.uid), profileDoc(profile))
     },
 
     async loadProgress(uid) {
       try {
         const snap = await getDoc(doc(db, 'progress', uid))
-        return (snap.data()?.items as Progress | undefined) ?? {}
+        return normalizeSaved(snap.data() ?? {})
       } catch (err) {
         if (denied(err)) throw new NoAccessError()
         throw err
       }
     },
 
-    async saveProgress(uid, progress) {
-      await setDoc(doc(db, 'progress', uid), { items: progress }, { merge: true })
-    },
-
-    async saveAnswer(uid, aestheticId, entry, stats) {
+    async saveProgress(uid, patch, profile) {
       const batch = writeBatch(db)
-      batch.set(doc(db, 'progress', uid), { items: { [aestheticId]: entry } }, { merge: true })
-      batch.set(doc(db, 'profiles', uid), { ...stats, updatedAt: serverTimestamp() }, { merge: true })
+      batch.set(doc(db, 'progress', uid), patch, { merge: true })
+      if (profile) batch.set(doc(db, 'profiles', uid), profileDoc(profile))
       await batch.commit()
     },
 
@@ -126,13 +126,21 @@ export function createFirebaseBackend(): Backend {
   }
 }
 
+// The whole document is replaced on every save, so old fields never linger.
+function profileDoc({ uid: _uid, ...p }: Profile) {
+  return { ...p, updatedAt: serverTimestamp() }
+}
+
 function toProfile(uid: string, d: Record<string, unknown>): Profile {
-  return {
+  const p: Profile = {
     uid,
     nickname: String(d.nickname ?? ''),
     avatar: String(d.avatar ?? ''),
-    learned: Number(d.learned ?? 0),
+    lessonPoints: Number(d.lessonPoints ?? 0),
+    bestStreak: Number(d.bestStreak ?? 0),
     correct: Number(d.correct ?? 0),
     answered: Number(d.answered ?? 0),
   }
+  for (const key of ['best25', 'best50', 'best100'] as const) if (typeof d[key] === 'number') p[key] = d[key]
+  return p
 }

@@ -35,12 +35,18 @@ service cloud.firestore {
       return isAllowed() && request.auth.uid == uid;
     }
 
+    function optionalTime(d, key) {
+      return !(key in d) || (d[key] is int && d[key] > 0);
+    }
+
     function validProfile(d) {
-      return d.keys().hasOnly(['nickname', 'avatar', 'learned', 'correct', 'answered', 'updatedAt'])
-        && d.keys().hasAll(['nickname', 'avatar', 'learned', 'correct', 'answered'])
+      return d.keys().hasOnly(['nickname', 'avatar', 'lessonPoints', 'bestStreak', 'best25', 'best50', 'best100', 'correct', 'answered', 'updatedAt'])
+        && d.keys().hasAll(['nickname', 'avatar', 'lessonPoints', 'bestStreak', 'correct', 'answered'])
         && d.nickname is string && d.nickname.size() >= 1 && d.nickname.size() <= 24
         && d.avatar is string && d.avatar.size() <= 100
-        && d.learned is int && d.learned >= 0 && d.learned <= 1000
+        && d.lessonPoints is int && d.lessonPoints >= 0 && d.lessonPoints <= 1000
+        && d.bestStreak is int && d.bestStreak >= 0 && d.bestStreak <= 100000
+        && optionalTime(d, 'best25') && optionalTime(d, 'best50') && optionalTime(d, 'best100')
         && d.correct is int && d.answered is int
         && d.correct >= 0 && d.correct <= d.answered;
     }

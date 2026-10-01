@@ -1,13 +1,14 @@
 // Local stand-in for Firebase so the app can be tried without a Firebase
 // project: `npm run dev:demo`. Everything is stored in this browser only.
-import type { AppUser, Profile, Progress } from '../types'
+import { normalizeSaved } from '../lib/progress'
+import type { AppUser, Profile, SavedProgress } from '../types'
 import type { Backend } from './types'
 
 const ME: AppUser = { uid: 'demo-me', email: 'you@example.com', name: 'Demo You' }
 const FRIENDS: Profile[] = [
-  { uid: 'f1', nickname: 'Ines', avatar: 'art-deco', learned: 41, correct: 180, answered: 214 },
-  { uid: 'f2', nickname: 'Tomás', avatar: 'art-nouveau', learned: 12, correct: 60, answered: 95 },
-  { uid: 'f3', nickname: 'Yuki', avatar: 'memphis-design', learned: 12, correct: 70, answered: 80 },
+  { uid: 'f1', nickname: 'Ines', avatar: 'art-deco', lessonPoints: 61, bestStreak: 54, best25: 151_000, best50: 330_000, correct: 180, answered: 214 },
+  { uid: 'f2', nickname: 'Tomás', avatar: 'art-nouveau', lessonPoints: 12, bestStreak: 9, correct: 60, answered: 95 },
+  { uid: 'f3', nickname: 'Yuki', avatar: 'memphis-design', lessonPoints: 12, bestStreak: 27, best25: 240_000, correct: 70, answered: 80 },
 ]
 
 function read<T>(key: string, fallback: T): T {
@@ -33,6 +34,7 @@ export function createDemoBackend(): Backend {
   const listeners = new Set<(u: AppUser | null) => void>()
   const current = () => (read('signedIn', false) ? ME : null)
   const emit = () => listeners.forEach((cb) => cb(current()))
+  const loadSaved = (uid: string) => normalizeSaved(read<unknown>(`progress:${uid}`, {}))
 
   return {
     onAuthChange(cb) {
@@ -52,20 +54,18 @@ export function createDemoBackend(): Backend {
     async loadProfile(uid) {
       return read<Profile | null>(`profile:${uid}`, null)
     },
-    async saveProfile(uid, p) {
-      write(`profile:${uid}`, { uid, ...p })
+    async saveProfile(profile) {
+      write(`profile:${profile.uid}`, profile)
     },
     async loadProgress(uid) {
       await tick()
-      return read<Progress>(`progress:${uid}`, {})
+      return loadSaved(uid)
     },
-    async saveProgress(uid, progress) {
-      write(`progress:${uid}`, { ...read<Progress>(`progress:${uid}`, {}), ...progress })
-    },
-    async saveAnswer(uid, id, entry, stats) {
-      write(`progress:${uid}`, { ...read<Progress>(`progress:${uid}`, {}), [id]: entry })
-      const profile = read<Profile | null>(`profile:${uid}`, null)
-      if (profile) write(`profile:${uid}`, { ...profile, ...stats })
+    async saveProgress(uid, patch, profile) {
+      const saved = loadSaved(uid)
+      const next: SavedProgress = { items: { ...saved.items, ...patch.items }, stats: patch.stats ?? saved.stats }
+      write(`progress:${uid}`, next)
+      if (profile) write(`profile:${uid}`, profile)
     },
     async listProfiles() {
       await tick()
