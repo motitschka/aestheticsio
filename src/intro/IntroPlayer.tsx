@@ -28,7 +28,8 @@ export type IntroMode = 'live' | 'video'
 const BASE = import.meta.env.BASE_URL
 const SITE = 'motitschka.github.io/aestheticsio'
 const FOLLOW = 'frutiger-aero'
-const FLASH = ['clovercore', 'global-village-coffeehouse'] as const
+/** The looks that flash past after Frutiger Aero, two beats each; the last one holds a little longer. */
+const FLASH = ['clovercore', 'corporate-grunge', 'parisian-girly', 'jiggy-era', 'dollar-store-vernacular', 'utopian-scholastic', 'global-village-coffeehouse'] as const
 const OPTIONS = ['art-deco', 'frutiger-aero', 'dorfic', 'y2k-futurism']
 
 // ---------- the timeline (seconds) ----------
@@ -40,17 +41,17 @@ const LOOP = 4.8
 /** The video cut answers by itself here. */
 const VIDEO_ANSWER = 6.6
 /** After the answer: τ. */
+const flashAt = (i: number) => 9.4 + i * 1.2
+const FLASH_END = flashAt(FLASH.length - 1) + 1.5
 const P = {
   learn: 1.6, // quiz → lesson's first card
   continueTap: 3.6,
   make: 5.4, // → lesson finished, theme unlocked
   useTap: 6.9,
   home: 8.2, // → the app's home in Frutiger Aero
-  flash1: 9.4,
-  flash2: 10.9,
-  end: 12.4,
-  start: 13.0, // "Start learning" (live) or the end card (video)
-  videoEnd: 15.6,
+  end: FLASH_END,
+  start: FLASH_END + 0.6, // "Start learning" (live) or the end card (video)
+  videoEnd: FLASH_END + 3.2,
 }
 export const VIDEO_LENGTH = VIDEO_ANSWER + P.videoEnd
 
@@ -60,6 +61,13 @@ const lerp = (a: number, b: number, k: number) => a + (b - a) * k
 const outCubic = (k: number) => 1 - (1 - k) ** 3
 const inOutSine = (k: number) => -(Math.cos(Math.PI * k) - 1) / 2
 const spring = (k: number) => (k >= 1 ? 1 : 1 - Math.exp(-6 * k) * Math.cos(10 * k))
+const bounce = (k: number) => {
+  const n = 7.5625, d = 2.75
+  if (k < 1 / d) return n * k * k
+  if (k < 2 / d) return n * (k -= 1.5 / d) * k + 0.75
+  if (k < 2.5 / d) return n * (k -= 2.25 / d) * k + 0.9375
+  return n * (k -= 2.625 / d) * k + 0.984375
+}
 const p = (t: number, a: number, b: number, ease = outCubic) => ease(clamp((t - a) / (b - a)))
 
 // ---------- layout: a design canvas scaled to the screen ----------
@@ -192,6 +200,8 @@ export function IntroPlayer({ mode, onDone }: { mode: IntroMode; onDone(): void 
     const a = byId.get(FOLLOW)!
     const followTheme = themes[FOLLOW]
     const flashThemes = FLASH.map((id) => themes[id])
+    const flashNames = FLASH.map((id) => byId.get(id)?.name ?? id)
+    const more = all.length - 1 - FLASH.length
     const choices = OPTIONS.map((id) => byId.get(id)!).map((x) => ({ key: x.id, label: x.name, aesthetic: x }))
     const question: ChoiceQuestion = video
       ? { ...buildPractice('clues-to-name', a, all, byId, () => 0.5), choices }
@@ -305,8 +315,7 @@ export function IntroPlayer({ mode, onDone }: { mode: IntroMode; onDone(): void 
         once('done', tau >= P.make, () => { scene = { k: 'done', themeInUse: false }; draw(); fw().scrollTo(0, 0) })
         once('use', tau >= P.useTap, () => { scene = { k: 'done', themeInUse: true }; setTheme(followTheme) })
         once('home', tau >= P.home, () => { scene = { k: 'home' }; draw(); fw().scrollTo(0, 0) })
-        once('flash1', tau >= P.flash1, () => setTheme(flashThemes[0]))
-        once('flash2', tau >= P.flash2, () => setTheme(flashThemes[1]))
+        FLASH.forEach((_, i) => once(`flash${i}`, tau >= flashAt(i), () => setTheme(flashThemes[i])))
       }
       // the gallery drifts down; in the video the finished screen starts below its photo
       if (scene.k === 'lesson' && cards[1] === 'gallery' && tau > P.continueTap) fw().scrollTo(0, p(tau, P.continueTap + 0.3, P.make - 0.2, inOutSine) * 300)
@@ -333,7 +342,7 @@ export function IntroPlayer({ mode, onDone }: { mode: IntroMode; onDone(): void 
 
       // ---- theme collages, each arriving the way its aesthetic moves ----
       const boards = [...(r.boards.current?.children ?? [])] as HTMLElement[]
-      const starts = [P.useTap, P.flash1, P.flash2]
+      const starts = [P.useTap, ...FLASH.map((_, i) => flashAt(i))]
       boards.forEach((b, i) => {
         if (answerAt === null) return style(b, 0)
         const at = starts[i]
@@ -341,28 +350,83 @@ export function IntroPlayer({ mode, onDone }: { mode: IntroMode; onDone(): void 
         const shown = tau >= at && (next === undefined || tau < next + 0.7)
         if (!shown) return style(b, 0)
         const out = ending
-        const tiles = [...b.children] as HTMLElement[]
-        if (i === 0) {
-          // Frutiger Aero: a slow, glassy fade; the pins rise like bubbles
-          const k = p(tau, at, at + 1.1, inOutSine)
-          style(b, k * (1 - out), `scale(${1.05 - 0.05 * k}) translateY(${-(tau - at) * L.u(9)}px)`)
-        } else if (i === 1) {
-          // Clovercore: pins pop in with a bounce
-          style(b, p(tau, at, at + 0.25) * (1 - out))
-          tiles.forEach((tile, n) => {
-            const kk = clamp((tau - at - (n % 9) * 0.035 - Math.floor(n / 9) * 0.02) / 0.6)
-            tile.style.transform = `scale(${0.35 + 0.65 * spring(kk)})`
-            tile.style.opacity = String(clamp(kk * 4))
-          })
-        } else {
-          // Global Village Coffeehouse: pasted on in three batches, a little crooked
-          style(b, (tau >= at ? 1 : 0) * (1 - out))
-          tiles.forEach((tile, n) => {
-            const batch = n % 3
-            const on = tau >= at + batch * 0.14
-            tile.style.opacity = on ? '1' : '0'
-            tile.style.transform = `rotate(${((n * 37) % 13) - 6}deg) translate(${((n * 17) % 9) - 4}px, ${((n * 23) % 7) - 3}px)`
-          })
+        const k = tau - at
+        const tiles = [...b.querySelectorAll<HTMLElement>('img')]
+        const shine = b.querySelector<HTMLElement>('.intro-shine')
+        const cols = L.boardCols
+        switch (b.dataset.id) {
+          case 'frutiger-aero': {
+            // a slow, glassy fade; the pins rise like bubbles
+            const e = p(k, 0, 1.1, inOutSine)
+            style(b, e * (1 - out), `scale(${1.05 - 0.05 * e}) translateY(${-k * L.u(9)}px)`)
+            break
+          }
+          case 'clovercore':
+            // pins pop in with a bounce
+            style(b, p(k, 0, 0.25) * (1 - out))
+            tiles.forEach((tile, n) => {
+              const e = clamp((k - (n % 9) * 0.035 - Math.floor(n / 9) * 0.02) / 0.6)
+              tile.style.transform = `scale(${0.35 + 0.65 * spring(e)})`
+              tile.style.opacity = String(clamp(e * 4))
+            })
+            break
+          case 'corporate-grunge':
+            // filed in row by row, hard and fast, with a jolt
+            style(b, (1 - out), `translateX(${Math.sin(k * 90) * L.u(4) * (1 - clamp(k / 0.3))}px)`)
+            tiles.forEach((tile, n) => {
+              const e = p(k, Math.floor(n / cols) * 0.045, Math.floor(n / cols) * 0.045 + 0.16)
+              tile.style.transform = `translateX(${-(1 - e) * L.W * 0.7}px)`
+              tile.style.opacity = e > 0 ? '1' : '0'
+            })
+            break
+          case 'parisian-girly':
+            // drifting down softly, like petals
+            style(b, p(k, 0, 0.5, inOutSine) * (1 - out))
+            tiles.forEach((tile, n) => {
+              const d = ((n * 7) % 5) * 0.06
+              const e = p(k, d, d + 0.9, inOutSine)
+              tile.style.transform = `translateY(${-(1 - e) * L.u(34)}px) rotate(${(1 - e) * (((n * 13) % 7) - 3)}deg)`
+              tile.style.opacity = String(e)
+            })
+            break
+          case 'jiggy-era': {
+            // a fisheye zoom, then a chrome shine sweeps across
+            const e = p(k, 0, 0.35)
+            style(b, clamp(k / 0.12) * (1 - out), `scale(${1.32 - 0.32 * e})`)
+            if (shine) {
+              shine.style.opacity = '1'
+              shine.style.transform = `translateX(${lerp(-1.2, 1.2, p(k, 0.15, 0.75, inOutSine)) * L.W}px) skewX(-18deg)`
+            }
+            tiles.forEach((tile) => { tile.style.transform = 'none'; tile.style.opacity = '1' })
+            break
+          }
+          case 'dollar-store-vernacular':
+            // slapped on like stickers, landing with a bounce
+            style(b, (1 - out))
+            tiles.forEach((tile, n) => {
+              const d = ((n * 7) % 11) * 0.028
+              const e = p(k, d, d + 0.34, bounce)
+              tile.style.transform = `translateY(${-(1 - e) * L.u(140)}px) rotate(${((n * 29) % 21) - 10}deg)`
+              tile.style.opacity = k >= d ? '1' : '0'
+            })
+            break
+          case 'utopian-scholastic':
+            // a tidy wipe, column by column
+            style(b, (1 - out))
+            tiles.forEach((tile, n) => {
+              const d = (n % cols) * 0.07
+              const e = p(k, d, d + 0.3)
+              tile.style.transform = `translateY(${(1 - e) * L.u(10)}px)`
+              tile.style.opacity = String(e)
+            })
+            break
+          default:
+            // Global Village Coffeehouse: pasted on in three batches, a little crooked
+            style(b, (1 - out))
+            tiles.forEach((tile, n) => {
+              tile.style.opacity = k >= (n % 3) * 0.14 ? '1' : '0'
+              tile.style.transform = `rotate(${((n * 37) % 13) - 6}deg) translate(${((n * 17) % 9) - 4}px, ${((n * 23) % 7) - 3}px)`
+            })
         }
       })
 
@@ -383,20 +447,37 @@ export function IntroPlayer({ mode, onDone }: { mode: IntroMode; onDone(): void 
           }
         }
         // Frutiger Aero takes over: the screen floats like a bubble
-        if (tau >= P.useTap && tau < P.flash1) {
+        if (tau >= P.useTap && tau < flashAt(0)) {
           const bob = p(tau, P.useTap, P.useTap + 0.8)
           sy += Math.sin((tau - P.useTap) * 2.1) * L.u(5) * bob
           extra = ` rotate(${Math.sin((tau - P.useTap) * 1.3) * 0.4 * bob}deg)`
         }
-        // Clovercore: a springy pop
-        if (tau >= P.flash1 && tau < P.flash2) {
-          const kk = clamp((tau - P.flash1) / 0.7)
-          extra = ` scale(${1 + (1 - spring(kk)) * -0.05})`
-        }
-        // Global Village Coffeehouse: snaps in crooked, then straightens in steps
-        if (tau >= P.flash2) {
-          const steps = Math.min(3, Math.floor((tau - P.flash2) / 0.09))
-          extra = ` rotate(${[-3, -1.8, -0.7, 0][steps]}deg)`
+        // then each flashing look moves the screen its own way
+        const f = FLASH.findLastIndex((_, i) => tau >= flashAt(i))
+        if (f >= 0) {
+          const kk = tau - flashAt(f)
+          switch (FLASH[f]) {
+            case 'clovercore': // a springy pop
+              extra = ` scale(${1 - (1 - spring(clamp(kk / 0.7))) * 0.05})`
+              break
+            case 'corporate-grunge': // a hard jolt
+              sx += Math.sin(kk * 80) * L.u(3) * (1 - clamp(kk / 0.3))
+              break
+            case 'parisian-girly': // a gentle sway
+              extra = ` rotate(${Math.sin(kk * 2.6) * 0.7}deg)`
+              sy += Math.sin(kk * 2.6 + 1) * L.u(3)
+              break
+            case 'jiggy-era': // a bump on every beat
+              extra = ` scale(${1 + 0.025 * Math.exp(-((kk % 0.6) * 9))})`
+              break
+            case 'dollar-store-vernacular': // a wobble that settles
+              extra = ` rotate(${Math.sin(kk * 14) * 2.2 * (1 - clamp(kk / 0.7))}deg)`
+              break
+            case 'utopian-scholastic': // calm and level
+              break
+            default: // Global Village Coffeehouse: snaps in crooked, then straightens in steps
+              extra = ` rotate(${[-3, -1.8, -0.7, 0][Math.min(3, Math.floor(kk / 0.09))]}deg)`
+          }
         }
         const out = p(tau, P.end, P.end + 0.8, inOutSine)
         so *= 1 - out
@@ -425,12 +506,18 @@ export function IntroPlayer({ mode, onDone }: { mode: IntroMode; onDone(): void 
       }
       card(r.learn.current, t, after(P.learn + 0.1), after(P.make - 0.2))
       card(r.make.current, t, after(P.make + 0.1), after(P.end))
-      const names = p(t, after(P.flash1), after(P.flash1 + 0.5))
+      // the small text names each look as it arrives
       const mSub = r.make.current?.querySelector<HTMLElement>('[data-sub]')
       const mNames = r.make.current?.querySelector<HTMLElement>('[data-names]')
+      const fi = answerAt === null ? -1 : FLASH.findLastIndex((_, i) => tau >= flashAt(i))
       if (mSub && mNames) {
-        mSub.style.opacity = String(1 - names)
-        mNames.style.opacity = String(names)
+        mSub.style.opacity = String(fi < 0 ? 1 : 1 - p(tau, flashAt(0), flashAt(0) + 0.25))
+        if (fi >= 0) {
+          const name = flashNames[fi]
+          const text = fi === FLASH.length - 1 ? `${name}, and ${more} more.` : name
+          if (mNames.textContent !== text) mNames.textContent = text
+          mNames.style.opacity = String(p(tau, flashAt(fi), flashAt(fi) + 0.22))
+        } else mNames.style.opacity = '0'
       }
 
       // ---- the end ----
@@ -598,10 +685,11 @@ export function IntroPlayer({ mode, onDone }: { mode: IntroMode; onDone(): void 
       <div ref={r.boards} className="intro-boards">
         {all &&
           [FOLLOW, ...FLASH].map((id) => (
-            <div key={id} className="intro-board" style={{ background: all[id].colours.bg, gridTemplateColumns: `repeat(${L.boardCols}, 1fr)` }}>
+            <div key={id} data-id={id} className="intro-board" style={{ background: all[id].colours.bg, gridTemplateColumns: `repeat(${L.boardCols}, 1fr)` }}>
               {Array.from({ length: L.boardCols * boardRows }, (_, n) => (
                 <img key={n} src={pin(all[id], 1 + ((n * 7 + 3) % 10))} alt="" />
               ))}
+              <div className="intro-shine" />
             </div>
           ))}
       </div>
@@ -632,7 +720,7 @@ export function IntroPlayer({ mode, onDone }: { mode: IntroMode; onDone(): void 
         <div className="intro-title" data-line style={{ fontSize: L.f.head, marginBottom: L.u(10) }}>Make it yours.</div>
         <div className="intro-sub" data-line style={{ fontSize: L.f.stepSub, display: 'grid' }}>
           <span data-sub style={{ gridArea: '1 / 1' }}>Learn a lesson and its look takes over the whole app.</span>
-          <span data-names style={{ gridArea: '1 / 1', opacity: 0 }}>Clovercore. Global Village Coffeehouse. 171 more.</span>
+          <span data-names style={{ gridArea: '1 / 1', opacity: 0 }} />
         </div>
       </div>
 

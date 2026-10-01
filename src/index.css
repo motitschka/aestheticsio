@@ -1713,12 +1713,25 @@ button.row {
 }
 
 .intro-board {
+  overflow: hidden;
   display: grid;
   gap: 8px;
   padding: 8px;
   align-content: start;
   opacity: 0;
   visibility: hidden;
+}
+
+/* Jiggy Era's chrome shine, swept across its collage */
+.intro-shine {
+  position: absolute;
+  top: -20%;
+  bottom: -20%;
+  left: 0;
+  width: 40%;
+  background: linear-gradient(90deg, transparent, rgb(255 255 255 / 55%), transparent);
+  opacity: 0;
+  pointer-events: none;
 }
 
 .intro-board img {

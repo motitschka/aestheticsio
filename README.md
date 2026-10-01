@@ -31,9 +31,10 @@ on the Aesthetics Wiki.
 - **Welcome intro:** the first visit opens with a live, interactive intro built from
   the app itself (`src/intro/`): a welcome on a wall of pins, then a real quiz the
   visitor answers ("Which aesthetic is this?", it waits for them), Frutiger Aero's
-  lesson, its theme unlocking and taking over the app, Clovercore and Global Village
-  Coffeehouse flashing past, and a **Start learning** button that goes straight in as
-  a guest. Music (in `public/intro/`) starts with **Sound on**; **Skip** is always
+  lesson, its theme unlocking and taking over the app, then Clovercore, Corporate
+  Grunge, Parisian Girly, Jiggy Era, Dollar Store Vernacular, Utopian Scholastic and
+  Global Village Coffeehouse flashing past (each moving and sounding like itself), and
+  a **Start learning** button that goes straight in as a guest. Music (in `public/intro/`) starts with **Sound on**; **Skip** is always
   there. It isn't shown with reduced motion or Save-Data, and can be replayed under
   **Me → Watch the intro**. A shareable video cut of it (no wiki photos) is rendered
   from the same code in dev with `?intro-video=portrait` or `landscape`.
