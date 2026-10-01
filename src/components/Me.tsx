@@ -4,6 +4,7 @@ import type { Aesthetic, AppUser, PlayerStats, Profile } from '../types'
 import { AllowlistEditor } from './Admin'
 import { Avatar } from './Avatar'
 import { BadgeShelf } from './Badges'
+import { Moodboard } from './Moodboard'
 
 interface Props {
   /** Signed-in account; null when playing as a guest. */
@@ -25,6 +26,7 @@ interface Props {
 export function Me({ account, onSignIn, stats, themes }: Props) {
   return (
     <section className="page">
+      <Moodboard from={7} />
       {account ? (
         <div className="card profile-card">
           <Avatar aesthetic={account.avatar} nickname={account.profile.nickname} size={72} />

@@ -15,7 +15,8 @@
     "emulators": "firebase emulators:start --only auth,firestore",
     "deploy:rules": "firebase deploy --only firestore:rules",
     "test:rules": "firebase emulators:exec --only firestore --project demo-aesthetics \"vitest run --config vitest.rules.config.ts\"",
-    "make-themes": "node scripts/make-themes.mjs"
+    "make-themes": "node scripts/make-themes.mjs",
+    "make-pins": "node scripts/make-pins.mjs"
   },
   "dependencies": {
     "firebase": "^12.19.0",

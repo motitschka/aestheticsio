@@ -6,6 +6,7 @@ import type { Aesthetic, PracticeMode, SavedProgress } from '../types'
 import { Avatar } from './Avatar'
 import { BadgeRow } from './Badges'
 import { Challenge, type ChallengeOutcome } from './Challenge'
+import { Moodboard, PinDeco } from './Moodboard'
 import { PracticeRound } from './PracticeRound'
 import { StateBadge } from './StateBadge'
 
@@ -115,6 +116,7 @@ export function Play({ all, byId, saved, now, nickname, onPractice, onChallengeE
 
   return (
     <section className="page start">
+      <Moodboard from={1} />
       <p className="eyebrow">{nickname ? `Hi ${nickname}` : 'Welcome'}</p>
       <h1 className="display">
         {pct}
@@ -139,15 +141,16 @@ export function Play({ all, byId, saved, now, nickname, onPractice, onChallengeE
         </button>
       )}
 
-      <div className="card challenge-card">
-        <div>
+      <div className="card challenge-card has-pin">
+        <PinDeco n={5} />
+        <div className="challenge-head">
           <h2>Mixed challenge</h2>
           <p className="muted small">Every question type, against the clock. One wrong answer ends the run.</p>
+          <p className="small">
+            Best: <strong>{stats.bestStreak}</strong> in a row
+          </p>
+          <BadgeRow stats={stats} />
         </div>
-        <p className="small">
-          Best: <strong>{stats.bestStreak}</strong> in a row
-        </p>
-        <BadgeRow stats={stats} />
         <button className="btn btn-primary" onClick={() => startChallenge()}>
           Endless run
         </button>

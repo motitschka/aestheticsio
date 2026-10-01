@@ -1,10 +1,12 @@
 import { useState } from 'react'
-import { themeUnlocked, type Theme, type Themes } from '../lib/theme'
+import { pinThumb, themeUnlocked, type Theme, type Themes } from '../lib/theme'
+import { Icon } from './Icon'
 import type { Aesthetic, Progress } from '../types'
 
 export function ThemePreview({ theme }: { theme: Theme }) {
   return (
     <span className="theme-preview" style={{ background: theme.colours.bg }}>
+      <img className="theme-pin" src={pinThumb(theme.id)} alt="" loading="lazy" decoding="async" />
       <span className="theme-preview-bar" style={{ background: theme.colours.accent }} />
       <span className="theme-swatches">
         {theme.swatches.map((c) => (
@@ -73,10 +75,7 @@ export function ThemePicker({ themes, aesthetics, items, current, onPick, onLess
                 <ThemePreview theme={themes[a.id]} />
                 {!open && (
                   <span className="theme-lock" aria-hidden>
-                    <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
-                      <rect x="5" y="11" width="14" height="10" rx="2" />
-                      <path d="M8 11V8a4 4 0 0 1 8 0v3" />
-                    </svg>
+                    <Icon name="lock" size={22} style="bold" />
                   </span>
                 )}
               </span>

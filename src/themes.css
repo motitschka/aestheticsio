@@ -1,0 +1,798 @@
+/*
+ * Theme families. Everything here only applies while an aesthetic theme is on
+ * (src/lib/theme.ts sets these data attributes on <html>); the default look is
+ * untouched. Each theme combines one of each family with its own colours, fonts
+ * and Pinterest pins (scripts/theme-designs.mjs).
+ */
+
+/* ---------- browser surfaces ---------- */
+
+:root[data-theme] {
+  caret-color: var(--accent);
+  scrollbar-color: color-mix(in srgb, var(--accent) 60%, var(--surface-2)) transparent;
+}
+
+:root[data-theme] ::selection {
+  background: var(--accent);
+  color: var(--on-accent);
+}
+
+:root[data-caps] :is(.title, .info-heading, .card h2, .prompt strong, .lesson-title, .section-title) {
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+/* ---------- motion ---------- */
+
+:root[data-theme] {
+  --ease: cubic-bezier(0.2, 0.8, 0.2, 1);
+  --dur: 260ms;
+  --page-in: page-rise;
+}
+
+:root[data-motion='bouncy'] { --ease: cubic-bezier(0.34, 1.56, 0.64, 1); --dur: 420ms; --page-in: page-pop; }
+:root[data-motion='snappy'] { --ease: cubic-bezier(0.2, 0, 0, 1); --dur: 120ms; --page-in: page-nudge; }
+:root[data-motion='glitch'] { --ease: steps(3, end); --dur: 280ms; --page-in: page-glitch; }
+:root[data-motion='float'] { --ease: cubic-bezier(0.22, 1, 0.36, 1); --dur: 640ms; --page-in: page-float; }
+:root[data-motion='stepped'] { --ease: steps(4, end); --dur: 320ms; --page-in: page-rise; }
+:root[data-motion='elegant'] { --ease: cubic-bezier(0.4, 0, 0.2, 1); --dur: 720ms; --page-in: page-soft; }
+:root[data-motion='wobble'] { --ease: cubic-bezier(0.5, 1.6, 0.4, 0.9); --dur: 520ms; --page-in: page-wobble; }
+
+:root[data-theme] .page {
+  animation: var(--page-in) var(--dur) var(--ease) both;
+  transform-origin: 50% 0;
+}
+
+/* Tilted cards and entrances must never cause sideways scrolling on a phone. */
+:root[data-theme] .app {
+  overflow-x: clip;
+}
+
+:root[data-theme] :is(.btn, .choice, .image-choice, .mode-row, .theme-tile, .row) {
+  transition-duration: var(--dur);
+  transition-timing-function: var(--ease);
+}
+
+:root[data-motion='bouncy'] .btn:active:not(:disabled) { transform: scale(0.94); }
+:root[data-motion='wobble'] .btn:active:not(:disabled) { transform: rotate(-2deg) scale(0.97); }
+:root[data-motion='snappy'] .btn:active:not(:disabled) { transform: translateY(1px); }
+
+:root[data-theme] .feedback-right {
+  animation: answer-pop var(--dur) var(--ease) both;
+}
+
+/* Entrances only move or scale, and their first frame is still fully readable
+   (no tilt, blur or colour shift), so a throttled or stalled animation can
+   never hide or garble the page. */
+@keyframes page-rise { from { transform: translateY(10px); } }
+@keyframes page-nudge { from { transform: translateY(4px); } }
+@keyframes page-pop { from { transform: scale(0.97); } }
+@keyframes page-soft { from { transform: translateY(14px); } }
+@keyframes page-float { from { transform: translateY(24px); } }
+@keyframes page-wobble {
+  0% { transform: translateY(8px) scale(0.985); }
+  55% { transform: translateY(-3px) scale(1.005); }
+}
+@keyframes page-glitch {
+  0% { transform: translateX(-3px); }
+  30% { transform: translateX(4px); filter: hue-rotate(90deg); }
+  60% { transform: translateX(-2px); filter: hue-rotate(-60deg); }
+  80% { filter: none; }
+}
+@keyframes answer-pop { from { transform: scale(0.92); } }
+
+/* ---------- backdrop: the pins as a collage ---------- */
+
+:root[data-layout='magazine'] .backdrop-tile,
+:root[data-layout='grid'] .backdrop-tile,
+:root[data-layout='top-tabs'] .backdrop-tile,
+:root[data-layout='terminal'] .backdrop-tile,
+:root[data-layout='framed'] .backdrop-tile {
+  transform: scale(1.04);
+  border-radius: 0;
+}
+
+:root[data-layout='zine'] .backdrop-tile {
+  border: 6px solid #fbfaf6;
+  border-bottom-width: 22px;
+  border-radius: 2px;
+  transform: rotate(calc(var(--tilt) * 1.6)) scale(1.1);
+}
+
+:root[data-layout='bubble'] .backdrop-tile {
+  border-radius: 999px;
+  transform: scale(0.96);
+}
+
+:root[data-layout='window'] .backdrop-tile {
+  border-top: 14px solid var(--accent);
+  border-radius: 6px;
+}
+
+/* ---------- patterns over the collage ---------- */
+
+.backdrop-pattern {
+  position: absolute;
+  z-index: 2;
+  inset: 0;
+  --pc: color-mix(in srgb, var(--accent) 34%, transparent);
+  --pc2: color-mix(in srgb, var(--text) 16%, transparent);
+  --pc3: color-mix(in srgb, var(--glow) 45%, transparent);
+}
+
+/* shapes drawn as SVG masks, tinted with the theme colour */
+:root:is([data-pattern='damask'], [data-pattern='stars'], [data-pattern='sparkles'], [data-pattern='fans'], [data-pattern='hearts'], [data-pattern='facets'], [data-pattern='arches'], [data-pattern='lattice'], [data-pattern='squiggle'], [data-pattern='mosaic'], [data-pattern='bubbles'], [data-pattern='stitch']) .backdrop-pattern {
+  background: var(--pc);
+  mask-repeat: repeat;
+}
+
+:root[data-pattern='damask'] .backdrop-pattern {
+  mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='56' height='56'%3E%3Cpath d='M28 4c5 7 12 9 12 16s-7 11-12 11-12-4-12-11 7-9 12-16zM28 33c3 5 8 6 8 11s-4 8-8 8-8-3-8-8 5-6 8-11z'/%3E%3Ccircle cx='4' cy='28' r='3'/%3E%3Ccircle cx='52' cy='28' r='3'/%3E%3C/svg%3E");
+  mask-size: 56px 56px;
+}
+
+:root[data-pattern='stars'] .backdrop-pattern {
+  mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='72' height='72'%3E%3Cpath d='M18 6l2.4 7.6L28 16l-7.6 2.4L18 26l-2.4-7.6L8 16l7.6-2.4zM52 40l1.6 5.4 5.4 1.6-5.4 1.6L52 54l-1.6-5.4-5.4-1.6 5.4-1.6z'/%3E%3Ccircle cx='58' cy='12' r='1.6'/%3E%3Ccircle cx='10' cy='56' r='1.3'/%3E%3Ccircle cx='36' cy='30' r='1'/%3E%3C/svg%3E");
+  mask-size: 72px 72px;
+}
+
+:root[data-pattern='sparkles'] .backdrop-pattern {
+  background: var(--pc3);
+  mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='44' height='44'%3E%3Cpath d='M11 4l1.4 5.6L18 11l-5.6 1.4L11 18l-1.4-5.6L4 11l5.6-1.4z'/%3E%3Ccircle cx='33' cy='30' r='1.6'/%3E%3Ccircle cx='38' cy='9' r='1'/%3E%3C/svg%3E");
+  mask-size: 44px 44px;
+}
+
+:root[data-pattern='fans'] .backdrop-pattern {
+  mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='48' height='24' fill='none' stroke='black' stroke-width='1.6'%3E%3Cpath d='M0 24a24 24 0 0 1 48 0M8 24a16 16 0 0 1 32 0M16 24a8 8 0 0 1 16 0M24 0v24M7 7l17 17M41 7L24 24'/%3E%3C/svg%3E");
+  mask-size: 48px 24px;
+}
+
+:root[data-pattern='hearts'] .backdrop-pattern {
+  mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='44' height='44'%3E%3Cpath d='M12 18s-7-4.2-7-8.6a3.6 3.6 0 0 1 7-1.4 3.6 3.6 0 0 1 7 1.4C19 13.8 12 18 12 18zM33 38s-5-3-5-6.2a2.6 2.6 0 0 1 5-1 2.6 2.6 0 0 1 5 1C38 35 33 38 33 38z'/%3E%3C/svg%3E");
+  mask-size: 44px 44px;
+}
+
+:root[data-pattern='facets'] .backdrop-pattern {
+  mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='40' height='40'%3E%3Cpath d='M0 0h40L20 20z' opacity='.7'/%3E%3Cpath d='M0 40l20-20 20 20z' opacity='.35'/%3E%3C/svg%3E");
+  mask-size: 40px 40px;
+}
+
+:root[data-pattern='arches'] .backdrop-pattern {
+  mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='48' height='48' fill='none' stroke='black' stroke-width='3'%3E%3Cpath d='M4 48a20 20 0 0 1 40 0M12 48a12 12 0 0 1 24 0M20 48a4 4 0 0 1 8 0'/%3E%3C/svg%3E");
+  mask-size: 48px 48px;
+}
+
+:root[data-pattern='lattice'] .backdrop-pattern {
+  mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='40' height='40' fill='none' stroke='black' stroke-width='1.6'%3E%3Cpath d='M0 20h40M20 0v40'/%3E%3Crect x='11' y='11' width='18' height='18'/%3E%3Cpath d='M0 0l11 11M40 0L29 11M0 40l11-11M40 40L29 29'/%3E%3C/svg%3E");
+  mask-size: 40px 40px;
+}
+
+:root[data-pattern='squiggle'] .backdrop-pattern {
+  mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='80' height='60'%3E%3Cpath d='M2 16c7-9 13-9 20 0s13 9 20 0' fill='none' stroke='black' stroke-width='3.5' stroke-linecap='round'/%3E%3Cpath d='M56 40l10 14H46z'/%3E%3Ccircle cx='14' cy='46' r='4'/%3E%3Cpath d='M58 6h12v12H58z' opacity='.6'/%3E%3C/svg%3E");
+  mask-size: 80px 60px;
+}
+
+:root[data-pattern='mosaic'] .backdrop-pattern {
+  mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='36' height='36'%3E%3Cpath d='M1 1h15l-2 13H1zM18 1h17v10l-15 4zM1 17h12l3 18H1zM17 18l18-4v21H19z' opacity='.75'/%3E%3C/svg%3E");
+  mask-size: 36px 36px;
+}
+
+:root[data-pattern='bubbles'] .backdrop-pattern {
+  mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='90' height='90' fill='none' stroke='black' stroke-width='2'%3E%3Ccircle cx='22' cy='24' r='14'/%3E%3Ccircle cx='66' cy='60' r='9'/%3E%3Ccircle cx='60' cy='18' r='4'/%3E%3Ccircle cx='20' cy='70' r='6'/%3E%3C/svg%3E");
+  mask-size: 90px 90px;
+}
+
+:root[data-pattern='stitch'] .backdrop-pattern {
+  mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='28' height='28'%3E%3Cpath d='M2 14h9M17 14h9' stroke='black' stroke-width='2' stroke-linecap='round'/%3E%3C/svg%3E");
+  mask-size: 28px 28px;
+}
+
+/* patterns built from gradients */
+:root[data-pattern='scanlines'] .backdrop-pattern {
+  background: repeating-linear-gradient(0deg, var(--pc2) 0 1px, transparent 1px 3px);
+}
+
+:root[data-pattern='lines'] .backdrop-pattern {
+  background: repeating-linear-gradient(0deg, var(--pc) 0 1px, transparent 1px 26px);
+}
+
+:root[data-pattern='grid'] .backdrop-pattern {
+  background:
+    linear-gradient(var(--pc) 1px, transparent 1px) 0 0 / 34px 34px,
+    linear-gradient(90deg, var(--pc) 1px, transparent 1px) 0 0 / 34px 34px;
+}
+
+:root[data-pattern='checker'] .backdrop-pattern {
+  background: conic-gradient(var(--pc) 25%, transparent 0 50%, var(--pc) 0 75%, transparent 0) 0 0 / 52px 52px;
+}
+
+:root[data-pattern='gingham'] .backdrop-pattern {
+  background:
+    repeating-linear-gradient(0deg, var(--pc) 0 12px, transparent 12px 24px),
+    repeating-linear-gradient(90deg, var(--pc) 0 12px, transparent 12px 24px);
+}
+
+:root[data-pattern='dither'] .backdrop-pattern {
+  background: conic-gradient(var(--pc2) 25%, transparent 0 50%, var(--pc2) 0 75%, transparent 0) 0 0 / 4px 4px;
+}
+
+:root[data-pattern='linen'] .backdrop-pattern {
+  background:
+    repeating-linear-gradient(0deg, var(--pc2) 0 1px, transparent 1px 4px),
+    repeating-linear-gradient(90deg, var(--pc2) 0 1px, transparent 1px 5px);
+}
+
+:root[data-pattern='halftone'] .backdrop-pattern {
+  background: radial-gradient(var(--pc) 1.6px, transparent 2.2px) 0 0 / 11px 11px;
+}
+
+:root[data-pattern='stripes'] .backdrop-pattern {
+  background: repeating-linear-gradient(90deg, var(--pc) 0 16px, transparent 16px 32px);
+}
+
+:root[data-pattern='zigzag'] .backdrop-pattern {
+  background:
+    linear-gradient(135deg, var(--pc) 25%, transparent 25%) -16px 0 / 32px 32px,
+    linear-gradient(225deg, var(--pc) 25%, transparent 25%) -16px 0 / 32px 32px,
+    linear-gradient(315deg, var(--pc) 25%, transparent 25%) 0 0 / 32px 32px,
+    linear-gradient(45deg, var(--pc) 25%, transparent 25%) 0 0 / 32px 32px;
+}
+
+:root[data-pattern='waves'] .backdrop-pattern {
+  background: radial-gradient(circle at 50% 100%, transparent 0 13px, var(--pc) 14px 17px, transparent 18px) 0 0 / 40px 20px;
+}
+
+:root[data-pattern='rays'] .backdrop-pattern {
+  background: repeating-conic-gradient(from 0deg at 50% 110%, var(--pc) 0 5deg, transparent 5deg 12deg);
+}
+
+:root[data-pattern='bulbs'] .backdrop-pattern {
+  background: radial-gradient(circle, color-mix(in srgb, var(--gold) 70%, transparent) 0 3px, color-mix(in srgb, var(--gold) 20%, transparent) 4px 8px, transparent 9px) 0 0 / 36px 36px;
+}
+
+:root[data-pattern='confetti'] .backdrop-pattern {
+  background:
+    radial-gradient(circle at 20% 30%, var(--pc) 0 3px, transparent 3.5px) 0 0 / 70px 70px,
+    radial-gradient(circle at 70% 60%, var(--pc3) 0 4px, transparent 4.5px) 0 0 / 70px 70px,
+    radial-gradient(circle at 45% 85%, color-mix(in srgb, var(--gold) 40%, transparent) 0 2.5px, transparent 3px) 0 0 / 70px 70px;
+}
+
+:root[data-pattern='haze'] .backdrop-pattern {
+  background:
+    radial-gradient(40% 30% at 20% 20%, var(--pc), transparent 70%),
+    radial-gradient(45% 35% at 85% 70%, var(--pc3), transparent 70%);
+}
+
+:root[data-pattern='grain'] .backdrop-pattern {
+  opacity: 0.35;
+  background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 .55 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+
+/* a synthwave floor: grid lines receding to the horizon */
+:root[data-pattern='horizon'] .backdrop-pattern {
+  inset: 45% -60% -20%;
+  background:
+    linear-gradient(var(--pc) 2px, transparent 2px) 0 0 / 60px 60px,
+    linear-gradient(90deg, var(--pc) 2px, transparent 2px) 0 0 / 60px 60px;
+  transform: perspective(260px) rotateX(58deg);
+  transform-origin: 50% 0;
+  mask-image: linear-gradient(transparent, black 30%);
+}
+
+/* ---------- moodboards and pin decorations ---------- */
+
+.moodboard {
+  display: grid;
+  grid-template-columns: 1.5fr 1fr 1fr;
+  gap: 8px;
+  height: 136px;
+}
+
+.moodboard-pin {
+  display: block;
+  overflow: hidden;
+  border-radius: var(--radius-sm);
+  background: var(--surface-2);
+  box-shadow: 0 8px 22px rgb(0 0 0 / 18%);
+}
+
+.moodboard-pin:nth-child(4) {
+  display: none;
+}
+
+.moodboard-pin img,
+.pin-deco img,
+.theme-pin {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+/* polaroids taped down at angles */
+:root[data-layout='zine'] .moodboard {
+  display: flex;
+  justify-content: center;
+  height: 156px;
+  padding: 6px 0;
+}
+
+:root[data-layout='zine'] .moodboard-pin {
+  display: block;
+  flex: 0 0 28%;
+  margin: 0 -2%;
+  padding: 6px 6px 22px;
+  border-radius: 2px;
+  background: #fbfaf6;
+  rotate: -5deg;
+}
+
+:root[data-layout='zine'] .moodboard-pin:nth-child(even) { rotate: 4deg; translate: 0 8px; }
+:root[data-layout='zine'] .moodboard-pin img { border-radius: 1px; }
+
+/* one wide lead image and a stack beside it */
+:root[data-layout='magazine'] .moodboard {
+  grid-template-columns: 2fr 1fr;
+  grid-template-rows: 1fr 1fr;
+  height: 196px;
+}
+
+:root[data-layout='magazine'] .moodboard-pin { border-radius: 0; box-shadow: none; }
+:root[data-layout='magazine'] .moodboard-pin:first-child { grid-row: span 2; }
+
+:root:is([data-layout='grid'], [data-layout='top-tabs']) .moodboard {
+  grid-template-columns: repeat(4, 1fr);
+  height: 110px;
+}
+
+:root:is([data-layout='grid'], [data-layout='top-tabs']) .moodboard-pin:nth-child(4) { display: block; }
+
+/* arches, for the centred, symmetrical worlds */
+:root[data-layout='centered'] .moodboard {
+  grid-template-columns: repeat(3, minmax(0, 96px));
+  justify-content: center;
+  height: 140px;
+}
+
+:root[data-layout='centered'] .moodboard-pin { border-radius: 999px 999px 6px 6px; }
+
+/* circles that overlap */
+:root[data-layout='bubble'] .moodboard {
+  display: flex;
+  justify-content: center;
+  height: auto;
+  padding-inline: 10px;
+}
+
+:root[data-layout='bubble'] .moodboard-pin {
+  display: block;
+  flex: 0 1 112px;
+  aspect-ratio: 1;
+  min-width: 0;
+  margin: 0 -10px;
+  border-radius: 999px;
+  border: 4px solid var(--surface);
+}
+
+:root[data-layout='bubble'] .moodboard-pin:nth-child(even) { translate: 0 8px; }
+
+/* windows with a title bar */
+:root[data-layout='window'] .moodboard-pin {
+  border: 1px solid color-mix(in srgb, var(--accent) 60%, var(--line));
+  border-top: 16px solid var(--accent);
+  border-radius: 8px;
+}
+
+/* framed like plates in a book */
+:root[data-layout='framed'] .moodboard {
+  padding: 8px;
+  border: 3px double color-mix(in srgb, var(--accent-text) 70%, transparent);
+  height: 152px;
+}
+
+:root[data-layout='framed'] .moodboard-pin { border-radius: 0; box-shadow: none; }
+
+/* a monitor: pixelated with scanlines */
+:root[data-layout='terminal'] .moodboard-pin {
+  position: relative;
+  border-radius: 0;
+  border: 1px solid var(--accent-text);
+}
+
+:root[data-layout='terminal'] .moodboard-pin::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: repeating-linear-gradient(0deg, rgb(0 0 0 / 28%) 0 1px, transparent 1px 3px);
+}
+
+/* fanned out like cards in a hand */
+:root[data-layout='floating'] .moodboard-pin:nth-child(1) { rotate: -3deg; }
+:root[data-layout='floating'] .moodboard-pin:nth-child(2) { rotate: 2deg; translate: 0 6px; }
+:root[data-layout='floating'] .moodboard-pin:nth-child(3) { rotate: -1.5deg; }
+
+/* idle motion for the pins only; text never moves */
+:root[data-motion='float'] .moodboard-pin { animation: drift 6s ease-in-out infinite alternate; }
+:root[data-motion='float'] .moodboard-pin:nth-child(2) { animation-delay: -2s; }
+:root[data-motion='float'] .moodboard-pin:nth-child(3) { animation-delay: -4s; }
+:root[data-motion='glitch'] .moodboard-pin:nth-child(2) { animation: flicker 5s steps(1) infinite; }
+
+@keyframes drift { to { translate: 0 -6px; } }
+@keyframes flicker {
+  0%, 92%, 100% { filter: none; transform: none; }
+  94% { filter: hue-rotate(80deg) saturate(1.6); transform: translateX(3px); }
+  96% { filter: invert(0.2); transform: translateX(-2px); }
+}
+
+.pin-deco {
+  display: block;
+  flex: none;
+  width: 92px;
+  aspect-ratio: 4 / 5;
+  overflow: hidden;
+  border: 4px solid var(--surface);
+  border-radius: var(--radius-sm);
+  box-shadow: 0 8px 20px rgb(0 0 0 / 22%);
+  rotate: 3deg;
+}
+
+.results-hero {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.results-hero > div {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+
+:root[data-theme] .card.has-pin {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  column-gap: 14px;
+  row-gap: 10px;
+}
+
+:root[data-theme] .card.has-pin > .pin-deco { grid-column: 2; grid-row: 1; width: 76px; align-self: start; }
+:root[data-theme] .card.has-pin > .challenge-head { grid-column: 1; grid-row: 1; display: flex; flex-direction: column; gap: 8px; }
+:root[data-theme] .card.has-pin > :not(.pin-deco, .challenge-head) { grid-column: 1 / -1; }
+
+/* ---------- layout families ---------- */
+
+/* floating pill tab bar */
+:root:is([data-layout='floating'], [data-layout='bubble']) .tabbar {
+  left: 12px;
+  right: 12px;
+  bottom: calc(12px + env(safe-area-inset-bottom));
+  max-width: 520px;
+  margin-inline: auto;
+  padding-bottom: 0;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  box-shadow: 0 12px 32px rgb(0 0 0 / 18%);
+}
+
+:root:is([data-layout='floating'], [data-layout='bubble']) .app.has-tabs {
+  padding-bottom: calc(var(--tabbar-h) + env(safe-area-inset-bottom) + 44px);
+}
+
+:root[data-layout='bubble'] {
+  --radius: 28px;
+  --radius-sm: 20px;
+}
+
+:root[data-layout='bubble'] .tabbar {
+  border: 3px solid var(--accent);
+  background: var(--surface);
+}
+
+:root[data-layout='bubble'] :is(.card, .list-item, .mode-row) {
+  border-width: 2px;
+}
+
+/* tabs along the top, like a website nav */
+:root[data-layout='top-tabs'] .tabbar {
+  top: 0;
+  bottom: auto;
+  padding: env(safe-area-inset-top) 0 0;
+  border-top: 0;
+  border-bottom: 1px solid var(--line);
+}
+
+:root[data-layout='top-tabs'] .tabbar button {
+  flex-direction: row;
+  gap: 8px;
+  height: 54px;
+  font-size: 0.8rem;
+}
+
+:root[data-layout='top-tabs'] .app.has-tabs {
+  padding-top: calc(54px + 20px + env(safe-area-inset-top));
+  padding-bottom: 32px;
+}
+
+/* a side rail on desktop, a tab bar on phones */
+@media (min-width: 900px) {
+  :root[data-layout='rail'] .tabbar {
+    top: 0;
+    right: auto;
+    bottom: 0;
+    width: 96px;
+    flex-direction: column;
+    justify-content: center;
+    gap: 8px;
+    padding: 0;
+    border-top: 0;
+    border-right: 1px solid var(--line);
+  }
+
+  :root[data-layout='rail'] .tabbar button { flex: none; height: 84px; }
+  :root[data-layout='rail'] .app.has-tabs { padding-bottom: 40px; }
+}
+
+/* cards in a grid */
+:root[data-layout='grid'] .mode-list {
+  grid-template-columns: 1fr 1fr;
+}
+
+:root[data-layout='grid'] .mode-row {
+  flex-direction: column;
+  align-items: flex-start;
+  height: 100%;
+}
+
+:root[data-layout='grid'] .mode-score {
+  align-items: flex-start;
+}
+
+@media (min-width: 520px) {
+  :root[data-layout='grid'] .page > .list {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+/* a printed frame around the whole screen */
+:root[data-layout='framed'] .app::before {
+  content: '';
+  position: fixed;
+  z-index: 4;
+  inset: 8px;
+  border: 4px double color-mix(in srgb, var(--accent-text) 75%, transparent);
+  border-radius: calc(var(--radius) + 4px);
+  pointer-events: none;
+}
+
+:root[data-layout='framed'] .app {
+  padding-inline: 24px;
+}
+
+:root[data-layout='framed'] .tabbar {
+  left: 14px;
+  right: 14px;
+  bottom: calc(14px + env(safe-area-inset-bottom));
+  padding-bottom: 0;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+}
+
+:root[data-layout='framed'] .app.has-tabs {
+  padding-bottom: calc(var(--tabbar-h) + env(safe-area-inset-bottom) + 44px);
+}
+
+/* symmetrical: headings and hero centred, reading text stays left-aligned */
+:root[data-layout='centered'] :is(.page > .title, .page > .eyebrow, .page > .display, .page > .section-title, .start > p, .card > h2, .results-hero, .lesson-status) {
+  text-align: center;
+  justify-content: center;
+  align-items: center;
+}
+
+:root[data-layout='centered'] .page > .bar {
+  width: 86%;
+  margin-inline: auto;
+}
+
+/* zine: cards pasted in at slight angles with tape. Long cards (theme and
+   avatar grids) stay straight: tilted, their far edges would leave the screen. */
+:root[data-layout='zine'] .card { rotate: -0.6deg; }
+:root[data-layout='zine'] .card:nth-of-type(even) { rotate: 0.6deg; }
+:root[data-layout='zine'] .mode-list li:nth-child(odd) .mode-row { rotate: -0.6deg; }
+:root[data-layout='zine'] .mode-list li:nth-child(even) .mode-row { rotate: 0.6deg; }
+:root[data-layout='zine'] .card:has(.theme-grid, .avatar-grid):nth-child(n) { rotate: none; }
+
+:root[data-layout='zine'] .card::before {
+  content: '';
+  position: absolute;
+  top: -10px;
+  left: 50%;
+  width: 76px;
+  height: 22px;
+  translate: -50% 0;
+  rotate: -3deg;
+  background: color-mix(in srgb, var(--gold) 38%, rgb(255 255 255 / 55%));
+  box-shadow: 0 1px 2px rgb(0 0 0 / 15%);
+}
+
+/* old operating-system windows */
+:root[data-layout='window'] .card {
+  padding-top: 40px;
+  overflow: hidden;
+}
+
+:root[data-layout='window'] .card::before {
+  content: '';
+  position: absolute;
+  inset: 0 0 auto;
+  height: 26px;
+  background: linear-gradient(var(--accent), color-mix(in srgb, var(--accent) 72%, black));
+}
+
+:root[data-layout='window'] .card::after {
+  content: '';
+  position: absolute;
+  top: 8px;
+  right: 10px;
+  width: 38px;
+  height: 10px;
+  background: radial-gradient(circle, var(--on-accent) 0 3.5px, transparent 4px) 0 0 / 13px 10px repeat-x;
+  opacity: 0.85;
+}
+
+:root[data-layout='window'] :root[data-theme] .card.has-pin > .pin-deco { margin-top: -4px; }
+
+:root[data-layout='window'] .tabbar {
+  border-top: 3px solid var(--accent);
+  background: var(--surface);
+}
+
+/* terminal: square, outlined, prompt marks */
+:root[data-layout='terminal'] {
+  --radius: 0;
+  --radius-sm: 0;
+  --pill: 0;
+}
+
+:root[data-layout='terminal'] :is(.card, .list-item, .mode-row, .choice) {
+  border: 1px solid color-mix(in srgb, var(--accent-text) 70%, transparent);
+  box-shadow: none;
+}
+
+:root[data-layout='terminal'] :is(.page > .title, .card > h2)::before {
+  content: '> ';
+  color: var(--accent-text);
+}
+
+:root[data-layout='terminal'] .tabbar span::before { content: '['; }
+:root[data-layout='terminal'] .tabbar span::after { content: ']'; }
+
+/* magazine: big type, rules instead of boxes */
+:root[data-layout='magazine'] .page > .title {
+  font-size: calc(3.1rem * var(--display-scale));
+  line-height: 0.95;
+}
+
+:root[data-layout='magazine'] .page > .display {
+  font-size: calc(5.6rem * var(--display-scale));
+}
+
+:root[data-layout='magazine'] .card {
+  border: 0;
+  border-top: 3px solid var(--text);
+  border-radius: 0;
+  box-shadow: 0 10px 24px rgb(0 0 0 / 8%);
+}
+
+:root[data-layout='magazine'] .section-title {
+  padding-bottom: 6px;
+  border-bottom: 1px solid var(--text);
+}
+
+/* ---------- icons ---------- */
+
+:root[data-icons='neon'] .tabbar .icon {
+  filter: drop-shadow(0 0 3px currentColor) drop-shadow(0 0 8px var(--accent));
+}
+
+:root[data-icons='chrome'] .tabbar .icon,
+:root[data-icons='bubbly'] .tabbar .icon {
+  filter: drop-shadow(0 2px 2px rgb(0 0 0 / 25%));
+}
+
+/* ---------- buttons and cards ---------- */
+
+:root[data-buttons='neon'] {
+  --pill: 10px;
+  --btn-shadow: 0 0 0 1px var(--accent), 0 0 16px color-mix(in srgb, var(--accent) 70%, transparent), 0 0 40px color-mix(in srgb, var(--accent) 30%, transparent);
+  --card-border: 1px solid color-mix(in srgb, var(--accent) 55%, transparent);
+  --card-shadow: 0 0 26px color-mix(in srgb, var(--accent) 16%, transparent);
+}
+
+:root[data-buttons='pixel'] {
+  --pill: 0;
+  --radius: 0;
+  --radius-sm: 0;
+  --btn-shadow: 0 -4px 0 0 color-mix(in srgb, var(--accent) 55%, black), 0 4px 0 0 color-mix(in srgb, var(--accent) 55%, black), -4px 0 0 0 color-mix(in srgb, var(--accent) 55%, black), 4px 0 0 0 color-mix(in srgb, var(--accent) 55%, black);
+  --card-border: 0;
+  --card-shadow: 0 -4px 0 0 var(--line), 0 4px 0 0 var(--line), -4px 0 0 0 var(--line), 4px 0 0 0 var(--line);
+}
+
+:root[data-buttons='pixel'] .btn-primary { margin-inline: 4px; }
+
+:root[data-buttons='chrome'] {
+  --pill: 999px;
+  --btn-bg: linear-gradient(180deg, #ffffff 0%, #dfe4ea 38%, #9aa3ae 52%, #eef1f4 100%);
+  --btn-ink: #14171c;
+  --btn-border: 1px solid #6b7480;
+  --btn-shadow: inset 0 1px 0 #fff, 0 3px 10px rgb(0 0 0 / 25%), 0 0 0 2px color-mix(in srgb, var(--accent) 45%, transparent);
+  --card-border: 1px solid color-mix(in srgb, var(--text) 22%, transparent);
+  --card-shadow: inset 0 1px 0 rgb(255 255 255 / 25%), 0 10px 26px rgb(0 0 0 / 22%);
+}
+
+:root[data-buttons='paper'] {
+  --pill: 3px;
+  --radius: 4px;
+  --radius-sm: 3px;
+  --btn-shadow: 0 2px 0 rgb(0 0 0 / 22%), 0 6px 14px rgb(0 0 0 / 14%);
+  --card-border: 0;
+  --card-shadow: 0 1px 2px rgb(0 0 0 / 14%), 0 10px 22px rgb(0 0 0 / 10%);
+}
+
+:root[data-buttons='clay'] {
+  --pill: 999px;
+  --radius: 28px;
+  --radius-sm: 20px;
+  --btn-shadow: inset 0 -6px 10px color-mix(in srgb, var(--accent) 65%, black), inset 0 6px 10px rgb(255 255 255 / 45%), 0 10px 22px color-mix(in srgb, var(--accent) 35%, transparent);
+  --card-border: 0;
+  --card-shadow: inset 0 -8px 16px rgb(0 0 0 / 6%), inset 0 8px 16px rgb(255 255 255 / 70%), 0 14px 30px rgb(0 0 0 / 9%);
+}
+
+:root[data-buttons='glass'] {
+  --pill: 999px;
+  --radius: 22px;
+  --card-bg: color-mix(in srgb, var(--surface) 74%, transparent);
+  --card-blur: blur(18px) saturate(1.4);
+  --card-border: 1px solid rgb(255 255 255 / 55%);
+  --card-shadow: 0 12px 32px rgb(0 0 0 / 12%);
+  --btn-shadow: inset 0 1px 0 rgb(255 255 255 / 60%), 0 8px 20px color-mix(in srgb, var(--accent) 35%, transparent);
+}
+
+:root[data-buttons='neu'] {
+  --pill: 16px;
+  --radius: 22px;
+  --card-bg: var(--bg);
+  --card-border: 0;
+  --card-shadow: 8px 8px 18px color-mix(in srgb, var(--text) 13%, transparent), -8px -8px 18px rgb(255 255 255 / 85%);
+  --btn-shadow: 5px 5px 12px color-mix(in srgb, var(--text) 18%, transparent), -5px -5px 12px rgb(255 255 255 / 80%);
+}
+
+:root[data-buttons='holo'] {
+  --pill: 999px;
+  --btn-bg: linear-gradient(115deg, #ffd1f4, #c9f0ff 30%, #d8ffd0 55%, #fff2b0 75%, #efc8ff);
+  --btn-ink: #1b1430;
+  --btn-shadow: 0 6px 18px color-mix(in srgb, var(--accent) 30%, transparent), inset 0 1px 0 #fff;
+  --card-border: 1px solid color-mix(in srgb, var(--accent) 35%, white);
+}
+
+/* surfaces that should match their cards */
+:root:is([data-buttons='glass'], [data-buttons='neu']) :is(.list-item, .mode-row, .feedback-panel) {
+  background: var(--card-bg);
+  backdrop-filter: var(--card-blur, none);
+  border: var(--card-border);
+  box-shadow: var(--card-shadow);
+}
+
+/* ---------- theme picker ---------- */
+
+.theme-pin {
+  position: absolute;
+  inset: 0;
+  opacity: 0.85;
+}
+
+.theme-preview > :not(.theme-pin) {
+  position: relative;
+}

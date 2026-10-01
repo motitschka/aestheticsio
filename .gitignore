@@ -31,3 +31,7 @@ ui-debug.log*
 
 # Claude Code desktop launch config
 .claude/
+
+# Full-size Pinterest boards (resized copies are published in public/pins/)
+pinterest/
+.impeccable/pins/

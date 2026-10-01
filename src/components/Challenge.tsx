@@ -4,6 +4,7 @@ import { BADGES, MILESTONES, type Milestone } from '../lib/progress'
 import { buildMixed, type Question } from '../lib/questions'
 import type { Aesthetic } from '../types'
 import { BadgeIcon } from './Badges'
+import { PinDeco } from './Moodboard'
 import { QuestionView } from './QuestionView'
 
 export interface ChallengeOutcome {
@@ -127,6 +128,8 @@ function ChallengeResults({ target, streak, time, splits, missed, outcome, onLes
 
   return (
     <section className="page results">
+      <div className="results-hero">
+      <div>
       <p className="eyebrow">{target ? `${target} in a row` : 'Mixed challenge'}</p>
       {target && !missed ? (
         <>
@@ -147,6 +150,9 @@ function ChallengeResults({ target, streak, time, splits, missed, outcome, onLes
           <p className="muted">in a row · {formatTime(time)}</p>
         </>
       )}
+      </div>
+      <PinDeco n={6} />
+      </div>
 
       {outcome.records.length > 0 && (
         <div className="card">

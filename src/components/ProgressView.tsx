@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react'
 import { SIZE } from '../lib/images'
 import { lessonPoints, lessonState, overallPercent, type LessonState } from '../lib/progress'
 import type { Aesthetic, Progress } from '../types'
+import { Moodboard } from './Moodboard'
 import { Photo } from './Photo'
 import { StateBadge } from './StateBadge'
 
@@ -42,6 +43,7 @@ export function ProgressView({ aesthetics, items, now, onLesson }: Props) {
 
   return (
     <section className="page">
+      <Moodboard from={4} />
       <h1 className="title">Lessons</h1>
       <div className="bar bar-200" aria-hidden>
         <div className="bar-fill" style={{ width: `${Math.min(pct, 200) / 2}%` }} />

@@ -1,6 +1,7 @@
 import { useCallback, useState } from 'react'
 import { MODE_INFO, type Question } from '../lib/questions'
 import type { Aesthetic, PracticeMode } from '../types'
+import { PinDeco } from './Moodboard'
 import { QuestionView } from './QuestionView'
 
 interface Answer {
@@ -76,12 +77,17 @@ function Results({ mode, answers, score, onLesson, onAgain, onExit }: { mode: Pr
 
   return (
     <section className="page results">
-      <p className="eyebrow">{MODE_INFO[mode].title}</p>
-      <h1 className="display">
-        {right}
-        <span className="display-of"> / {answers.length}</span>
-      </h1>
-      <p className="muted">{mode === 'timeline' ? 'orderings right' : 'correct'}</p>
+      <div className="results-hero">
+        <div>
+          <p className="eyebrow">{MODE_INFO[mode].title}</p>
+          <h1 className="display">
+            {right}
+            <span className="display-of"> / {answers.length}</span>
+          </h1>
+          <p className="muted">{mode === 'timeline' ? 'orderings right' : 'correct'}</p>
+        </div>
+        <PinDeco n={3} />
+      </div>
 
       {recognised.length > 0 && (
         <div className="card">

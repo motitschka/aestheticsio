@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { createBackend, isDemo, NoAccessError, type Backend } from './backend'
 import type { ProgressPatch } from './backend/types'
 import { Backdrop } from './components/Backdrop'
@@ -30,6 +30,8 @@ import {
 } from './lib/progress'
 import type { Question } from './lib/questions'
 import { applyTheme, themeUnlocked, type Themes } from './lib/theme'
+import { ThemeContext } from './lib/theme-context'
+import { Icon, type IconName } from './components/Icon'
 import type { AestheticsData, AppUser, PracticeMode, SavedProgress } from './types'
 
 type Tab = 'play' | 'progress' | 'ranks' | 'me'
@@ -195,6 +197,18 @@ export default function App() {
     [commit],
   )
 
+  // Development only: try any theme from the console with __tryTheme('art-deco').
+  useEffect(() => {
+    if (!import.meta.env.DEV) return
+    const w = window as unknown as { __tryTheme?: (id: string) => void }
+    w.__tryTheme = (id: string) => {
+      const s = savedRef.current
+      const entry = { ...(s.items[id] ?? { c: 0, w: 0, t: 0 }), u: 1 as const }
+      const stats = { ...s.stats, theme: id }
+      commit({ items: { ...s.items, [id]: entry }, stats }, { items: { [id]: entry }, stats })
+    }
+  }, [commit])
+
   const listProfiles = useCallback(() => backend!.listProfiles(), [backend])
 
   const loadStreakRank = useCallback(async () => {
@@ -303,11 +317,10 @@ export default function App() {
   const lesson = lessonId ? byId.get(lessonId) : undefined
   const showTabs = !inRound && !lesson
 
-  const themeAesthetic = theme ? byId.get(theme.id) : undefined
-
   return (
+    <ThemeContext.Provider value={theme ?? null}>
     <main className={`app ${showTabs ? 'has-tabs' : 'in-round'}`}>
-      {themeAesthetic && <Backdrop aesthetic={themeAesthetic} />}
+      {theme && <Backdrop theme={theme} />}
       {lesson && (
         <Lesson
           key={lesson.id}
@@ -373,24 +386,21 @@ export default function App() {
 
       {showTabs && (
         <nav className="tabbar">
-          <TabButton id="play" label="Play" tab={tab} onTab={setTab} icon={<path d="M8 5.5v13l11-6.5z" />} />
-          <TabButton id="progress" label="Lessons" tab={tab} onTab={setTab} icon={<path d="M4 5.5A2.5 2.5 0 0 1 6.5 3H20v15H6.5A2.5 2.5 0 0 0 4 20.5zM4 20.5A2.5 2.5 0 0 0 6.5 23H20v-5" />} />
-          {backend && (
-            <TabButton id="ranks" label="Leaderboard" tab={tab} onTab={setTab} icon={<path d="M8 21h8M12 17v4M7 4h10v5a5 5 0 0 1-10 0zM7 6H4a3 3 0 0 0 3 4M17 6h3a3 3 0 0 1-3 4" />} />
-          )}
-          <TabButton id="me" label="Me" tab={tab} onTab={setTab} icon={<path d="M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM4 21a8 8 0 0 1 16 0" />} />
+          <TabButton id="play" label="Play" tab={tab} onTab={setTab} icon="play" />
+          <TabButton id="progress" label="Lessons" tab={tab} onTab={setTab} icon="lessons" />
+          {backend && <TabButton id="ranks" label="Leaderboard" tab={tab} onTab={setTab} icon="ranks" />}
+          <TabButton id="me" label="Me" tab={tab} onTab={setTab} icon="me" />
         </nav>
       )}
     </main>
+    </ThemeContext.Provider>
   )
 }
 
-function TabButton({ id, label, tab, onTab, icon }: { id: Tab; label: string; tab: Tab; onTab(t: Tab): void; icon: ReactNode }) {
+function TabButton({ id, label, tab, onTab, icon }: { id: Tab; label: string; tab: Tab; onTab(t: Tab): void; icon: IconName }) {
   return (
     <button className={tab === id ? 'on' : ''} onClick={() => onTab(id)} aria-current={tab === id ? 'page' : undefined}>
-      <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-        {icon}
-      </svg>
+      <Icon name={icon} />
       <span>{label}</span>
     </button>
   )

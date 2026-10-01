@@ -21,16 +21,20 @@ on the Aesthetics Wiki.
 - **Mixed challenge:** every question type against the clock; one wrong answer ends
   the run. Play it endless, or as a 25, 50 or 100 sprint. Badges for 10/25/50/100 in
   a row and for 25/50/100 in under 3/6/12 minutes.
-- **Themes:** learning a lesson unlocks that aesthetic's theme for the whole app:
-  colours taken from its own images, a matching display font and button style, and
-  a collage of its images in the background. Pick one under **Me → Themes**.
+- **Themes:** learning a lesson unlocks that aesthetic's theme for the whole app.
+  Each one is designed from a Pinterest moodboard of 10 pins and changes almost
+  everything: colours (taken from the pins), display and body fonts, button and
+  card shapes, a drawn pattern, motion, icons and layout (tab bar, rail, window
+  chrome, zine, terminal…). Its pins show as a collage behind every screen, as a
+  moodboard strip on Play, Lessons and Me, and framed beside scores. Quiz and
+  lesson pictures still come from the wiki. Pick one under **Me → Themes**.
 - **Play without signing in:** guest progress is saved in the browser.
 - **Or sign in with Google (invite only):** progress syncs across devices and you
   join the friends leaderboard (lessons % and best streak). Guest progress comes
   with you the first time you sign in.
 - **Stack:** Vite + React + TypeScript on GitHub Pages; Firebase Auth (Google) and
-  Firestore on the free Spark plan for sign-in, sync and the leaderboard. Images
-  load directly from Fandom.
+  Firestore on the free Spark plan for sign-in, sync and the leaderboard. Wiki
+  images load directly from Fandom; theme pins are served from `public/pins/`.
 
 ## Run it locally
 
@@ -86,7 +90,8 @@ site is guest-only.
 | `npm test` | Quiz logic tests |
 | `npm run test:rules` | Firestore security rules tests (needs Java 21+) |
 | `npm run fetch-data` | Re-download the aesthetics into `data/aesthetics.json`; commit and push to publish |
-| `npm run make-themes` | Rebuild `data/themes.json` from the images (after `fetch-data`). Fonts and button styles are hand-picked in `scripts/theme-styles.mjs` |
+| `npm run make-pins` | Resize the Pinterest boards in `pinterest/<Aesthetic name>/` (local, not committed) into `public/pins/<id>/` |
+| `npm run make-themes` | Rebuild `data/themes.json`: colours from each board's pins, plus the hand-picked fonts, shapes, layout, icons, motion and pattern in `scripts/theme-designs.mjs` |
 | `npm run deploy:rules` | Deploy `firestore.rules` to Firebase |
 
 ## How access works
