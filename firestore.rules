@@ -1,0 +1,62 @@
+rules_version = '2';
+
+// Who can do what (the aesthetics themselves ship with the app):
+// - the owner (adminEmail) manages the allowlist
+// - allowlisted accounts can read everyone's leaderboard profile, and
+//   read/write only their own progress and profile
+// - everyone else is denied everything (guests never touch the database)
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Set with: npm run set-admin -- you@gmail.com
+    function adminEmail() {
+      return 'REPLACE_WITH_YOUR_GOOGLE_EMAIL';
+    }
+
+    function signedIn() {
+      return request.auth != null && request.auth.token.email_verified == true;
+    }
+
+    function email() {
+      return request.auth.token.email.lower();
+    }
+
+    function isAdmin() {
+      return signedIn() && email() == adminEmail().lower();
+    }
+
+    function isAllowed() {
+      let allowlist = /databases/$(database)/documents/config/allowlist;
+      return isAdmin()
+        || (signedIn() && exists(allowlist) && email() in get(allowlist).data.emails);
+    }
+
+    function isSelf(uid) {
+      return isAllowed() && request.auth.uid == uid;
+    }
+
+    function validProfile(d) {
+      return d.keys().hasOnly(['nickname', 'avatar', 'learned', 'correct', 'answered', 'updatedAt'])
+        && d.keys().hasAll(['nickname', 'avatar', 'learned', 'correct', 'answered'])
+        && d.nickname is string && d.nickname.size() >= 1 && d.nickname.size() <= 24
+        && d.avatar is string && d.avatar.size() <= 100
+        && d.learned is int && d.learned >= 0 && d.learned <= 1000
+        && d.correct is int && d.answered is int
+        && d.correct >= 0 && d.correct <= d.answered;
+    }
+
+    match /config/allowlist {
+      allow read, write: if isAdmin();
+    }
+
+    match /progress/{uid} {
+      allow read, write: if isSelf(uid);
+    }
+
+    match /profiles/{uid} {
+      allow read: if isAllowed();
+      allow create, update: if isSelf(uid) && validProfile(request.resource.data);
+      allow delete: if isSelf(uid);
+    }
+  }
+}
