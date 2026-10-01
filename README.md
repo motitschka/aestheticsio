@@ -4,6 +4,8 @@ A phone-friendly quiz for learning the 173 design aesthetics in
 [Category:Design Aesthetics](https://aesthetics.fandom.com/wiki/Category:Design_Aesthetics)
 on the Aesthetics Wiki.
 
+**Play it:** https://motitschka.github.io/aestheticsio/
+
 - **Play without signing in:** guest progress is saved in the browser.
 - **Or sign in with Google (invite only):** progress syncs across devices and you
   join the friends leaderboard. Guest progress comes with you the first time you sign in.
