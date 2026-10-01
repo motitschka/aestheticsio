@@ -14,7 +14,8 @@
     "set-admin": "node scripts/set-admin.mjs",
     "emulators": "firebase emulators:start --only auth,firestore",
     "deploy:rules": "firebase deploy --only firestore:rules",
-    "test:rules": "firebase emulators:exec --only firestore --project demo-aesthetics \"vitest run --config vitest.rules.config.ts\""
+    "test:rules": "firebase emulators:exec --only firestore --project demo-aesthetics \"vitest run --config vitest.rules.config.ts\"",
+    "make-themes": "node scripts/make-themes.mjs"
   },
   "dependencies": {
     "firebase": "^12.19.0",
@@ -29,6 +30,7 @@
     "@vitejs/plugin-react": "^6.1.1",
     "firebase-tools": "^15.32.0",
     "oxlint": "^1.81.0",
+    "sharp": "^0.35.5",
     "typescript": "~6.0.2",
     "vite": "^8.3.0",
     "vitest": "^5.0.3"

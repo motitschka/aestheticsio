@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { createBackend, isDemo, NoAccessError, type Backend } from './backend'
 import type { ProgressPatch } from './backend/types'
+import { Backdrop } from './components/Backdrop'
 import type { ChallengeOutcome } from './components/Challenge'
 import { Message, NoAccess, SignIn, Splash } from './components/Gates'
 import { Leaderboard, LeaderboardSignIn } from './components/Leaderboard'
@@ -9,7 +10,8 @@ import { Me } from './components/Me'
 import { Play } from './components/Play'
 import { ProfileEditor } from './components/ProfileEditor'
 import { ProgressView } from './components/ProgressView'
-import { loadAestheticsData } from './data'
+import { ThemePicker } from './components/ThemePicker'
+import { loadAestheticsData, loadThemes } from './data'
 import { formatTime } from './lib/format'
 import { clearGuestProgress, hasGuestProgress, loadGuestChoice, loadGuestProgress, saveGuestChoice, saveGuestProgress } from './lib/guest'
 import {
@@ -27,6 +29,7 @@ import {
   type Milestone,
 } from './lib/progress'
 import type { Question } from './lib/questions'
+import { applyTheme, themeUnlocked, type Themes } from './lib/theme'
 import type { AestheticsData, AppUser, PracticeMode, SavedProgress } from './types'
 
 type Tab = 'play' | 'progress' | 'ranks' | 'me'
@@ -38,6 +41,7 @@ const emptySaved = (): SavedProgress => ({ items: {}, stats: emptyStats() })
 export default function App() {
   const [data, setData] = useState<AestheticsData | null>(null)
   const [dataFailed, setDataFailed] = useState(false)
+  const [themes, setThemes] = useState<Themes | null>(null)
   // undefined while loading; null when Firebase isn't configured (guest-only site)
   const [backend, setBackend] = useState<Backend | null | undefined>(undefined)
   const [user, setUser] = useState<AppUser | null | undefined>(undefined)
@@ -61,6 +65,7 @@ export default function App() {
   useEffect(() => {
     loadAestheticsData().then(setData, () => setDataFailed(true))
     createBackend().then(setBackend, () => setBackend(null))
+    loadThemes().then(setThemes, () => setThemes(null))
   }, [])
 
   useEffect(() => backend?.onAuthChange(setUser), [backend])
@@ -109,6 +114,11 @@ export default function App() {
   const status: Status = session && account && session.uid === account.uid ? session.status : 'loading'
   const profile = useMemo(() => (account && identity ? profileFrom({ uid: account.uid, ...identity }, saved) : null), [account, identity, saved])
 
+  // The chosen theme, if it's unlocked, dresses the whole app.
+  const themeId = saved.stats.theme ?? ''
+  const theme = themes && themeId && themeUnlocked(saved.items[themeId]) ? themes[themeId] : null
+  useEffect(() => applyTheme(theme ?? null), [theme])
+
   /** Applies a change locally and saves it (account or this browser). */
   const commit = useCallback(
     (next: SavedProgress, patch: ProgressPatch) => {
@@ -152,7 +162,7 @@ export default function App() {
       const prev = s.items[id]
       const entry = applyLesson(prev, perfect, t)
       commit({ ...s, items: { ...s.items, [id]: entry } }, { items: { [id]: entry } })
-      return { before: lessonState(prev, t), after: lessonState(entry, t) }
+      return { before: lessonState(prev, t), after: lessonState(entry, t), unlocked: themeUnlocked(entry) && !themeUnlocked(prev) }
     },
     [commit],
   )
@@ -172,6 +182,15 @@ export default function App() {
       const newBadges = earnedBadges(after).filter((b) => !had.has(b))
       if (records.length) commit({ ...s, stats: after }, { stats: after })
       return { records, newBadges }
+    },
+    [commit],
+  )
+
+  const pickTheme = useCallback(
+    (id: string) => {
+      const s = savedRef.current
+      const stats = { ...s.stats, theme: id }
+      commit({ ...s, stats }, { stats })
     },
     [commit],
   )
@@ -284,8 +303,11 @@ export default function App() {
   const lesson = lessonId ? byId.get(lessonId) : undefined
   const showTabs = !inRound && !lesson
 
+  const themeAesthetic = theme ? byId.get(theme.id) : undefined
+
   return (
     <main className={`app ${showTabs ? 'has-tabs' : 'in-round'}`}>
+      {themeAesthetic && <Backdrop aesthetic={themeAesthetic} />}
       {lesson && (
         <Lesson
           key={lesson.id}
@@ -295,6 +317,9 @@ export default function App() {
           entry={saved.items[lesson.id]}
           state={lessonState(saved.items[lesson.id], now)}
           onFinish={(perfect) => recordLesson(lesson.id, perfect)}
+          theme={themes?.[lesson.id]}
+          themeInUse={themeId === lesson.id}
+          onUseTheme={pickTheme}
           onClose={() => {
             setLessonId(null)
             window.scrollTo({ top: 0 })
@@ -341,6 +366,7 @@ export default function App() {
             }
             onSignIn={backend ? signIn : undefined}
             stats={saved.stats}
+            themes={<ThemePicker themes={themes} aesthetics={aesthetics} items={saved.items} current={themeId} onPick={pickTheme} onLesson={openLesson} />}
           />
         )}
       </div>

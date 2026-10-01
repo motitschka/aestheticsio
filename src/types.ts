@@ -43,6 +43,8 @@ export interface Entry {
   lt?: Tier
   /** when the lesson last became learned, ms since epoch */
   la?: number
+  /** theme unlocked (stays unlocked even if the lesson drops back to seen) */
+  u?: 1
   /** practice answers right / wrong */
   c: number
   w: number
@@ -61,6 +63,8 @@ export interface PlayerStats {
   best25?: number
   best50?: number
   best100?: number
+  /** id of the chosen theme; '' for the default look */
+  theme?: string
 }
 
 export interface SavedProgress {

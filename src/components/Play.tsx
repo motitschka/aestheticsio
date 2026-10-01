@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 import { formatTime } from '../lib/format'
-import { lessonPoints, lessonState, overallPercent, recognised, type Milestone } from '../lib/progress'
+import { lessonPoints, lessonState, MILESTONES, overallPercent, recognised, type Milestone } from '../lib/progress'
 import { buildRound, eligible, MODE_INFO, PRACTICE_MODES, type Question } from '../lib/questions'
 import type { Aesthetic, PracticeMode, SavedProgress } from '../types'
 import { Avatar } from './Avatar'
@@ -25,7 +25,7 @@ interface Props {
   onRoundActive(active: boolean): void
 }
 
-type View = { k: 'hub' } | { k: 'round'; mode: PracticeMode; questions: Question[]; n: number } | { k: 'challenge'; n: number }
+type View = { k: 'hub' } | { k: 'round'; mode: PracticeMode; questions: Question[]; n: number } | { k: 'challenge'; target?: Milestone; n: number }
 
 export function Play({ all, byId, saved, now, nickname, onPractice, onChallengeEnd, onLesson, loadStreakRank, onRoundActive }: Props) {
   const [view, setView] = useState<View>({ k: 'hub' })
@@ -62,8 +62,8 @@ export function Play({ all, byId, saved, now, nickname, onPractice, onChallengeE
     setView((v) => ({ k: 'round', mode, questions, n: v.k === 'round' ? v.n + 1 : 0 }))
     onRoundActive(true)
   }
-  const startChallenge = () => {
-    setView((v) => ({ k: 'challenge', n: v.k === 'challenge' ? v.n + 1 : 0 }))
+  const startChallenge = (target?: Milestone) => {
+    setView((v) => ({ k: 'challenge', target, n: v.k === 'challenge' ? v.n + 1 : 0 }))
     onRoundActive(true)
   }
   const exit = () => {
@@ -87,7 +87,19 @@ export function Play({ all, byId, saved, now, nickname, onPractice, onChallengeE
     )
   }
   if (view.k === 'challenge') {
-    return <Challenge key={view.n} all={all} byId={byId} onEnd={onChallengeEnd} onLesson={onLesson} loadRank={loadStreakRank} onAgain={startChallenge} onExit={exit} />
+    return (
+      <Challenge
+        key={view.n}
+        all={all}
+        byId={byId}
+        target={view.target}
+        onEnd={onChallengeEnd}
+        onLesson={onLesson}
+        loadRank={view.target ? undefined : loadStreakRank}
+        onAgain={() => startChallenge(view.target)}
+        onExit={exit}
+      />
+    )
   }
 
   const points = lessonPoints(saved.items)
@@ -130,16 +142,26 @@ export function Play({ all, byId, saved, now, nickname, onPractice, onChallengeE
       <div className="card challenge-card">
         <div>
           <h2>Mixed challenge</h2>
-          <p className="muted small">Every question type, against the clock. Keep going until your first mistake.</p>
+          <p className="muted small">Every question type, against the clock. One wrong answer ends the run.</p>
         </div>
         <p className="small">
           Best: <strong>{stats.bestStreak}</strong> in a row
-          {stats.best25 !== undefined && <> · fastest 25 in {formatTime(stats.best25)}</>}
         </p>
         <BadgeRow stats={stats} />
-        <button className="btn btn-primary" onClick={startChallenge}>
-          Start challenge
+        <button className="btn btn-primary" onClick={() => startChallenge()}>
+          Endless run
         </button>
+        <div className="sprint-row">
+          {MILESTONES.map((m) => {
+            const best = stats[`best${m}`]
+            return (
+              <button key={m} className="btn btn-secondary sprint-btn" onClick={() => startChallenge(m)} aria-label={`${m} in a row`}>
+                <strong>{m}</strong>
+                <small>{best !== undefined ? `best ${formatTime(best)}` : 'in a row'}</small>
+              </button>
+            )
+          })}
+        </div>
       </div>
 
       <h2 className="section-title">Practice</h2>

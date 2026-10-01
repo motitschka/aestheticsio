@@ -14,6 +14,8 @@ export interface ChallengeOutcome {
 interface Props {
   all: Aesthetic[]
   byId: Map<string, Aesthetic>
+  /** 25, 50 or 100: a sprint that ends once you reach it. Undefined: endless. */
+  target?: Milestone
   /** Records the finished run. */
   onEnd(streak: number, splits: Partial<Record<Milestone, number>>): ChallengeOutcome
   onLesson(a: Aesthetic): void
@@ -31,7 +33,14 @@ function freshQuestion(all: Aesthetic[], byId: Map<string, Aesthetic>, recent: s
   return q
 }
 
-export function Challenge({ all, byId, onEnd, onLesson, loadRank, onAgain, onExit }: Props) {
+interface End {
+  time: number
+  /** the question that ended the run; null when a sprint was completed */
+  missed: Question | null
+  outcome: ChallengeOutcome
+}
+
+export function Challenge({ all, byId, target, onEnd, onLesson, loadRank, onAgain, onExit }: Props) {
   const [question, setQuestion] = useState<Question>(() => freshQuestion(all, byId, []))
   const recent = useRef<string[]>([])
   const [count, setCount] = useState(0)
@@ -39,7 +48,7 @@ export function Challenge({ all, byId, onEnd, onLesson, loadRank, onAgain, onExi
   const [startedAt] = useState(() => performance.now())
   const [now, setNow] = useState(startedAt)
   const [splits, setSplits] = useState<Partial<Record<Milestone, number>>>({})
-  const [end, setEnd] = useState<{ time: number; missed: Question; outcome: ChallengeOutcome } | null>(null)
+  const [end, setEnd] = useState<End | null>(null)
   const [showResults, setShowResults] = useState(false)
 
   useEffect(() => {
@@ -52,8 +61,10 @@ export function Challenge({ all, byId, onEnd, onLesson, loadRank, onAgain, onExi
     const elapsed = Math.round(performance.now() - startedAt)
     if (correct) {
       const s = streak + 1
+      const reached = (MILESTONES as readonly number[]).includes(s) ? { ...splits, [s]: elapsed } : splits
       setStreak(s)
-      if ((MILESTONES as readonly number[]).includes(s)) setSplits((x) => ({ ...x, [s]: elapsed }))
+      setSplits(reached)
+      if (target && s >= target) setEnd({ time: elapsed, missed: null, outcome: onEnd(s, reached) })
     } else {
       setEnd({ time: elapsed, missed: question, outcome: onEnd(streak, splits) })
     }
@@ -75,7 +86,8 @@ export function Challenge({ all, byId, onEnd, onLesson, loadRank, onAgain, onExi
     }
   }, [end, question, all, byId])
 
-  if (end && showResults) return <ChallengeResults streak={streak} time={end.time} splits={splits} missed={end.missed} outcome={end.outcome} onLesson={onLesson} loadRank={loadRank} onAgain={onAgain} onExit={onExit} />
+  if (end && showResults)
+    return <ChallengeResults target={target} streak={streak} time={end.time} splits={splits} missed={end.missed} outcome={end.outcome} onLesson={onLesson} loadRank={loadRank} onAgain={onAgain} onExit={onExit} />
 
   return (
     <section className="page quiz">
@@ -84,7 +96,7 @@ export function Challenge({ all, byId, onEnd, onLesson, loadRank, onAgain, onExi
           ✕
         </button>
         <span className="challenge-streak">
-          <strong className="tabular">{streak}</strong> in a row
+          <strong className="tabular">{streak}</strong> {target ? `/ ${target}` : 'in a row'}
         </span>
         <span className="challenge-timer tabular">{formatTime((end?.time ?? now - startedAt) | 0)}</span>
       </div>
@@ -93,11 +105,12 @@ export function Challenge({ all, byId, onEnd, onLesson, loadRank, onAgain, onExi
   )
 }
 
-function ChallengeResults({ streak, time, splits, missed, outcome, onLesson, loadRank, onAgain, onExit }: {
+function ChallengeResults({ target, streak, time, splits, missed, outcome, onLesson, loadRank, onAgain, onExit }: {
+  target?: Milestone
   streak: number
   time: number
   splits: Partial<Record<Milestone, number>>
-  missed: Question
+  missed: Question | null
   outcome: ChallengeOutcome
   onLesson(a: Aesthetic): void
   loadRank?(): Promise<{ rank: number; total: number } | null>
@@ -110,13 +123,30 @@ function ChallengeResults({ streak, time, splits, missed, outcome, onLesson, loa
   }, [loadRank])
 
   const badges = BADGES.filter((b) => outcome.newBadges.includes(b.id))
-  const target = 'target' in missed ? missed.target : null
+  const missedAesthetic = missed && 'target' in missed ? missed.target : null
 
   return (
     <section className="page results">
-      <p className="eyebrow">Mixed challenge</p>
-      <h1 className="display">{streak}</h1>
-      <p className="muted">in a row · {formatTime(time)}</p>
+      <p className="eyebrow">{target ? `${target} in a row` : 'Mixed challenge'}</p>
+      {target && !missed ? (
+        <>
+          <h1 className="display tabular">{formatTime(time)}</h1>
+          <p className="muted">All {target} right in a row. Done!</p>
+        </>
+      ) : target ? (
+        <>
+          <h1 className="display">
+            {streak}
+            <span className="display-of"> / {target}</span>
+          </h1>
+          <p className="muted">One wrong answer ends the run · {formatTime(time)}</p>
+        </>
+      ) : (
+        <>
+          <h1 className="display">{streak}</h1>
+          <p className="muted">in a row · {formatTime(time)}</p>
+        </>
+      )}
 
       {outcome.records.length > 0 && (
         <div className="card">
@@ -148,7 +178,7 @@ function ChallengeResults({ streak, time, splits, missed, outcome, onLesson, loa
         </div>
       )}
 
-      {(loadRank || splits[25] !== undefined) && (
+      {(loadRank || (!target && splits[25] !== undefined)) && (
       <div className="card stat-row">
         {MILESTONES.filter((m) => splits[m] !== undefined).map((m) => (
           <div key={m}>
@@ -165,9 +195,9 @@ function ChallengeResults({ streak, time, splits, missed, outcome, onLesson, loa
       </div>
       )}
 
-      {target && (
-        <button className="btn btn-secondary" onClick={() => onLesson(target)}>
-          Take the lesson on {target.name}
+      {missedAesthetic && (
+        <button className="btn btn-secondary" onClick={() => onLesson(missedAesthetic)}>
+          Take the lesson on {missedAesthetic.name}
         </button>
       )}
       <button className="btn btn-primary btn-big" onClick={onAgain}>

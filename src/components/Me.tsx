@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react'
 import type { Backend } from '../backend'
 import type { Aesthetic, AppUser, PlayerStats, Profile } from '../types'
 import { AllowlistEditor } from './Admin'
@@ -18,9 +19,10 @@ interface Props {
   /** Shown to guests when sign-in is available. */
   onSignIn?(): void
   stats: PlayerStats
+  themes: ReactNode
 }
 
-export function Me({ account, onSignIn, stats }: Props) {
+export function Me({ account, onSignIn, stats, themes }: Props) {
   return (
     <section className="page">
       {account ? (
@@ -50,6 +52,8 @@ export function Me({ account, onSignIn, stats }: Props) {
           )}
         </div>
       )}
+
+      {themes}
 
       <BadgeShelf stats={stats} />
 

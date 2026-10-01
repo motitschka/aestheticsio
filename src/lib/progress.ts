@@ -61,7 +61,7 @@ export function applyLesson(prev: Entry | undefined, perfect: boolean, now: numb
   if (e.lt === 3) return e
   if (!perfect) return { ...e, lt: 1 }
   if (e.lt === 2) return e.la !== undefined && now - e.la >= MASTERY_WAIT ? { ...e, lt: 3 } : e
-  return { ...e, lt: 2, la: now }
+  return { ...e, lt: 2, la: now, u: 1 }
 }
 
 const tierPoints = (lt: Tier | undefined) => (lt === 3 ? 2 : lt === 2 ? 1 : 0)
@@ -167,6 +167,7 @@ export function normalizeEntry(raw: Record<string, unknown>): Entry {
   }
   if (raw.lt === 1 || raw.lt === 2 || raw.lt === 3) e.lt = raw.lt
   if (typeof raw.la === 'number') e.la = raw.la
+  if (raw.u === 1 || (e.lt ?? 0) >= 2) e.u = 1
   return e
 }
 
@@ -187,6 +188,7 @@ function mergeEntry(a: Entry, b: Entry): Entry {
   if (newer.m) e.m = newer.m
   if (tierOwner.lt) e.lt = tierOwner.lt
   if (tierOwner.la !== undefined) e.la = tierOwner.la
+  if (a.u || b.u) e.u = 1
   return e
 }
 
@@ -201,6 +203,8 @@ export function mergeSaved(account: SavedProgress, guest: SavedProgress): SavedP
     timelineTotal: a.timelineTotal + g.timelineTotal,
     bestStreak: Math.max(a.bestStreak, g.bestStreak),
   }
+  const theme = a.theme || g.theme
+  if (theme) stats.theme = theme
   for (const m of MILESTONES) {
     const key = bestKey(m)
     const t = Math.min(a[key] ?? Infinity, g[key] ?? Infinity)

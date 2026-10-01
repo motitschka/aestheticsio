@@ -43,7 +43,7 @@ describe('lessons', () => {
   const now = 1_000 * DAY
 
   it('first time: perfect → learned, otherwise seen', () => {
-    expect(applyLesson(undefined, true, now)).toMatchObject({ lt: 2, la: now })
+    expect(applyLesson(undefined, true, now)).toMatchObject({ lt: 2, la: now, u: 1 })
     expect(applyLesson(undefined, false, now)).toMatchObject({ lt: 1 })
   })
 
@@ -65,6 +65,12 @@ describe('lessons', () => {
     const relearned = applyLesson(dropped, true, now + 41 * DAY)
     expect(relearned).toMatchObject({ lt: 2, la: now + 41 * DAY })
     expect(lessonState(relearned, now + 50 * DAY)).toBe('learned')
+  })
+
+  it('the theme stays unlocked when the lesson drops back to seen', () => {
+    const dropped = applyLesson(applyLesson(undefined, true, now), false, now + DAY)
+    expect(dropped).toMatchObject({ lt: 1, u: 1 })
+    expect(normalizeSaved({ items: { a: { lt: 2, c: 0, w: 0, t: 0 } } }).items.a.u).toBe(1)
   })
 
   it('mastered never drops', () => {
@@ -130,7 +136,7 @@ describe('loading and merging', () => {
     const account = normalizeSaved({ items: { a: { lt: 2, la: 5, m: { 'tell-apart': 1 }, c: 1, w: 0, t: 10 } }, stats: { ...emptyStats(), bestStreak: 8, best25: 300 } })
     const guest = normalizeSaved({ items: { a: { lt: 1, m: { 'tell-apart': 3 }, c: 3, w: 1, t: 20 }, b: { c: 1, w: 0, t: 1 } }, stats: { timelineRight: 2, timelineTotal: 3, bestStreak: 12, best25: 400 } })
     const merged = mergeSaved(account, guest)
-    expect(merged.items.a).toEqual({ lt: 2, la: 5, m: { 'tell-apart': 3 }, c: 4, w: 1, t: 20 })
+    expect(merged.items.a).toEqual({ lt: 2, la: 5, u: 1, m: { 'tell-apart': 3 }, c: 4, w: 1, t: 20 })
     expect(merged.items.b).toEqual(guest.items.b)
     expect(merged.stats).toEqual({ timelineRight: 2, timelineTotal: 3, bestStreak: 12, best25: 300 })
   })

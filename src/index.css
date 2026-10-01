@@ -7,6 +7,7 @@
   --line: #e2dbcf;
   --accent: #5b3fd9;
   --accent-soft: #e6e0fb;
+  --accent-text: #5b3fd9;
   --on-accent: #ffffff;
   --good: #1d8a57;
   --good-soft: #dcf1e5;
@@ -15,6 +16,9 @@
   --gold: #b8871b;
   --radius: 16px;
   --radius-sm: 10px;
+  /* Themes (src/lib/theme.ts) override these, plus the colours and fonts above. */
+  --pill: 999px;
+  --display-scale: 1;
   --shadow: 0 1px 2px rgb(40 30 20 / 6%), 0 4px 16px rgb(40 30 20 / 5%);
   --tabbar-h: 64px;
   --font: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
@@ -38,6 +42,7 @@
     --line: #322f36;
     --accent: #9d8bff;
     --accent-soft: #2c2645;
+    --accent-text: #9d8bff;
     --on-accent: #141216;
     --good: #4cc68b;
     --good-soft: #193527;
@@ -65,7 +70,7 @@ input {
 }
 
 a {
-  color: var(--accent);
+  color: var(--accent-text);
 }
 
 code {
@@ -112,7 +117,7 @@ p {
 }
 
 .gate-title {
-  font-size: clamp(2.6rem, 11vw, 3.6rem);
+  font-size: calc(clamp(2.6rem, 11vw, 3.6rem) * var(--display-scale));
 }
 
 /* ---------- type ---------- */
@@ -122,13 +127,14 @@ p {
   font-weight: 600;
   letter-spacing: 0.08em;
   text-transform: uppercase;
-  color: var(--accent);
+  color: var(--accent-text);
 }
 
 .display {
   font-family: var(--font-display);
   font-weight: 400;
-  font-size: 4.5rem;
+  font-size: calc(4.5rem * var(--display-scale));
+  overflow-wrap: anywhere;
   line-height: 1;
   letter-spacing: -0.01em;
 }
@@ -141,7 +147,8 @@ p {
 .title {
   font-family: var(--font-display);
   font-weight: 400;
-  font-size: 2.4rem;
+  font-size: calc(2.4rem * var(--display-scale));
+  overflow-wrap: anywhere;
   line-height: 1.05;
 }
 
@@ -194,8 +201,10 @@ h2 {
   min-height: 48px;
   padding: 0 20px;
   border: 0;
-  border-radius: 999px;
+  border-radius: var(--pill);
   font-weight: 600;
+  letter-spacing: var(--btn-spacing, normal);
+  text-transform: var(--btn-case, none);
   cursor: pointer;
   text-decoration: none;
   transition: transform 0.08s ease, background 0.15s ease, opacity 0.15s ease;
@@ -211,13 +220,16 @@ h2 {
 }
 
 .btn-primary {
-  background: var(--accent);
+  background: var(--btn-bg, var(--accent));
+  border: var(--btn-border, 0);
+  box-shadow: var(--btn-shadow, none);
   color: var(--on-accent);
 }
 
 .btn-secondary {
   background: var(--accent-soft);
-  color: var(--accent);
+  border: var(--btn-border-soft, 0);
+  color: var(--accent-text);
 }
 
 .btn-ghost {
@@ -256,7 +268,7 @@ h2 {
   min-height: 48px;
   padding: 0 16px;
   border: 1px solid var(--line);
-  border-radius: 12px;
+  border-radius: var(--radius-sm);
   background: var(--surface);
   font-size: 1rem; /* 16px keeps iOS from zooming in */
 }
@@ -336,7 +348,7 @@ h2 {
   padding: 6px 12px;
   border-radius: 999px;
   background: var(--accent-soft);
-  color: var(--accent);
+  color: var(--accent-text);
   font-size: 0.8rem;
   font-weight: 600;
   text-align: center;
@@ -349,8 +361,8 @@ h2 {
   padding: 16px;
   border-radius: var(--radius);
   background: var(--surface);
-  box-shadow: var(--shadow);
-  border: 1px solid var(--line);
+  box-shadow: var(--card-shadow, var(--shadow));
+  border: var(--card-border, 1px solid var(--line));
 }
 
 .bar {
@@ -476,7 +488,7 @@ h2 {
 
 .avatar-letter {
   background: var(--accent-soft);
-  color: var(--accent);
+  color: var(--accent-text);
   font-weight: 700;
 }
 
@@ -508,7 +520,7 @@ h2 {
 .stat-row strong {
   font-family: var(--font-display);
   font-weight: 400;
-  font-size: 1.8rem;
+  font-size: calc(1.8rem * var(--display-scale));
   line-height: 1.1;
 }
 
@@ -528,7 +540,7 @@ h2 {
 .prompt strong {
   font-family: var(--font-display);
   font-weight: 400;
-  font-size: 1.8em;
+  font-size: calc(1.8em * var(--display-scale));
   display: block;
   line-height: 1.1;
 }
@@ -551,7 +563,7 @@ h2 {
   min-height: 56px;
   padding: 10px 16px;
   border: 1.5px solid var(--line);
-  border-radius: 14px;
+  border-radius: var(--radius-sm);
   background: var(--surface);
   text-align: left;
   font-size: 1.02rem;
@@ -590,8 +602,17 @@ h2 {
   background: var(--bad-soft);
 }
 
-.is-dim {
-  opacity: 0.45;
+/* Dim the content, not the box: a see-through box would let the theme collage show through. */
+.choice.is-dim {
+  color: var(--muted);
+}
+
+.choice.is-dim .choice-key {
+  opacity: 0.5;
+}
+
+.image-choice.is-dim .photo {
+  opacity: 0.35;
 }
 
 .image-choices {
@@ -692,7 +713,8 @@ h2 {
 .list-item {
   border-radius: var(--radius);
   background: var(--surface);
-  border: 1px solid var(--line);
+  border: var(--card-border, 1px solid var(--line));
+  box-shadow: var(--card-shadow-small, none);
   overflow: hidden;
 }
 
@@ -799,7 +821,7 @@ button.row {
 
 .score {
   font-family: var(--font-display);
-  font-size: 1.6rem;
+  font-size: calc(1.6rem * var(--display-scale));
 }
 
 /* ---------- profile ---------- */
@@ -942,7 +964,7 @@ button.row {
 }
 
 .tabbar button.on {
-  color: var(--accent);
+  color: var(--accent-text);
 }
 
 /* ---------- questions ---------- */
@@ -1044,7 +1066,7 @@ button.row {
   width: 100%;
   padding: 8px 12px 8px 8px;
   border: 1.5px solid var(--line);
-  border-radius: 14px;
+  border-radius: var(--radius-sm);
   background: var(--surface);
   text-align: left;
   cursor: pointer;
@@ -1130,7 +1152,7 @@ button.row {
 .info-heading {
   font-family: var(--font-display);
   font-weight: 400;
-  font-size: 1.6rem;
+  font-size: calc(1.6rem * var(--display-scale));
   line-height: 1.1;
 }
 
@@ -1192,7 +1214,7 @@ button.row {
 
 .state-seen {
   background: var(--accent-soft);
-  color: var(--accent);
+  color: var(--accent-text);
 }
 
 .state-learned {
@@ -1255,7 +1277,8 @@ button.row {
   gap: 12px;
   width: 100%;
   padding: 12px 14px;
-  border: 1px solid var(--line);
+  border: var(--card-border, 1px solid var(--line));
+  box-shadow: var(--card-shadow-small, none);
   border-radius: var(--radius);
   background: var(--surface);
   text-align: left;
@@ -1296,7 +1319,7 @@ button.row {
 .challenge-streak strong {
   font-family: var(--font-display);
   font-weight: 400;
-  font-size: 1.6rem;
+  font-size: calc(1.6rem * var(--display-scale));
 }
 
 .challenge-timer {
@@ -1374,6 +1397,243 @@ button.row {
 
 .badge-list li.is-locked {
   opacity: 0.55;
+}
+
+
+/* ---------- themes ---------- */
+
+/* Collage of the theme's own images behind everything, softened by the background colour. */
+.backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  overflow: hidden;
+  pointer-events: none;
+  background: var(--bg);
+}
+
+.backdrop-grid {
+  position: absolute;
+  inset: -40px;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  grid-auto-rows: 180px;
+  gap: 6px;
+}
+
+/* every other column sits lower, so the tiles overlap like a collage */
+.backdrop-tile:nth-child(odd) {
+  translate: 0 50px;
+}
+
+.backdrop-tile {
+  border-radius: 10px;
+  overflow: hidden;
+  box-shadow: 0 6px 24px rgb(0 0 0 / 25%);
+}
+
+.backdrop-tile img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.backdrop::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(120% 60% at 50% 0%, color-mix(in srgb, var(--glow) 35%, transparent), transparent 70%),
+    color-mix(in srgb, var(--bg) var(--veil, 80%), transparent);
+}
+
+/* Text that sits straight on the collage gets a soft halo in the background colour. */
+:root[data-theme] :is(.page > p, .page > h1, .page > h2, .eyebrow, .display, .title, .section-title, .prompt, .muted:not(.card *, .list-item *, .mode-row *, .feedback-panel *)) {
+  text-shadow:
+    0 0 2px var(--bg),
+    0 0 8px var(--bg),
+    0 0 16px var(--bg);
+}
+
+:root[data-theme] body {
+  background: transparent;
+}
+
+:root[data-buttons='glossy'] {
+  --pill: 999px;
+  --radius: 20px;
+  --btn-bg: linear-gradient(180deg, color-mix(in srgb, var(--accent) 50%, white) 0%, var(--accent) 50%, color-mix(in srgb, var(--accent) 82%, black) 100%);
+  --btn-shadow: inset 0 1px 0 rgb(255 255 255 / 70%), inset 0 -3px 6px rgb(0 0 0 / 15%), 0 4px 14px color-mix(in srgb, var(--accent) 45%, transparent);
+  --card-shadow: inset 0 1px 0 rgb(255 255 255 / 35%), 0 6px 20px rgb(0 0 0 / 10%);
+}
+
+:root[data-buttons='sharp'] {
+  --pill: 0;
+  --radius: 0;
+  --radius-sm: 0;
+  --btn-spacing: 0.04em;
+  --btn-case: uppercase;
+}
+
+:root[data-buttons='retro'] {
+  --pill: 10px;
+  --radius: 12px;
+  --radius-sm: 8px;
+  --btn-border: 2px solid var(--text);
+  --btn-border-soft: 2px solid var(--text);
+  --btn-shadow: 3px 3px 0 var(--text);
+  --card-border: 2px solid var(--text);
+  --card-shadow: 4px 4px 0 var(--text);
+  --card-shadow-small: 3px 3px 0 var(--text);
+}
+
+:root[data-buttons='retro'] .btn:active:not(:disabled) {
+  transform: translate(2px, 2px);
+  box-shadow: 1px 1px 0 var(--text);
+}
+
+:root[data-buttons='ornate'] {
+  --pill: 3px;
+  --radius: 6px;
+  --radius-sm: 4px;
+  --btn-shadow: inset 0 0 0 2px var(--on-accent), inset 0 0 0 3px var(--accent);
+  --btn-border: 1px solid var(--accent);
+  --btn-spacing: 0.1em;
+  --btn-case: uppercase;
+  --card-border: 1px solid color-mix(in srgb, var(--accent) 45%, var(--line));
+}
+
+:root[data-buttons='outline'] {
+  --pill: 6px;
+  --radius: 8px;
+  --radius-sm: 6px;
+  --card-shadow: none;
+}
+
+:root[data-buttons='bubbly'] {
+  --pill: 999px;
+  --radius: 26px;
+  --radius-sm: 18px;
+  --btn-shadow: 0 5px 0 color-mix(in srgb, var(--accent) 65%, black);
+  --card-shadow: 0 5px 0 var(--line);
+}
+
+:root[data-buttons='bubbly'] .btn-primary:active:not(:disabled) {
+  transform: translateY(3px);
+  box-shadow: 0 2px 0 color-mix(in srgb, var(--accent) 65%, black);
+}
+
+/* theme picker */
+
+.theme-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(86px, 1fr));
+  gap: 8px;
+}
+
+.theme-tile {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 0;
+  border: 2px solid transparent;
+  border-radius: 12px;
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+  font: inherit;
+  color: inherit;
+}
+
+.theme-tile.on {
+  border-color: var(--accent);
+}
+
+.theme-preview {
+  position: relative;
+  display: grid;
+  grid-template-rows: 1fr auto;
+  gap: 6px;
+  aspect-ratio: 4 / 3;
+  padding: 8px;
+  border-radius: 10px;
+  overflow: hidden;
+  box-shadow: inset 0 0 0 1px rgb(0 0 0 / 10%);
+}
+
+.theme-preview-bar {
+  height: 10px;
+  width: 60%;
+  border-radius: 999px;
+}
+
+.theme-swatches {
+  display: flex;
+  gap: 3px;
+}
+
+.theme-swatches span {
+  flex: 1;
+  height: 10px;
+  border-radius: 3px;
+}
+
+.theme-name {
+  padding: 0 4px 4px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  line-height: 1.2;
+}
+
+.theme-tile.is-locked .theme-preview {
+  filter: grayscale(1) opacity(0.45);
+}
+
+.theme-lock {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  color: #fff;
+  text-shadow: 0 1px 4px rgb(0 0 0 / 60%);
+}
+
+.theme-unlocked {
+  flex-direction: row;
+  align-items: center;
+  border-color: var(--accent);
+}
+
+/* sprints */
+
+.sprint-row {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+}
+
+.sprint-btn {
+  flex-direction: column;
+  gap: 0;
+  min-height: 60px;
+  padding: 6px 8px;
+  line-height: 1.15;
+}
+
+.sprint-btn strong {
+  font-family: var(--font-display);
+  font-weight: 400;
+  font-size: calc(1.5rem * var(--display-scale));
+  letter-spacing: normal;
+}
+
+.sprint-btn small {
+  font-size: 0.72rem;
+  font-weight: 500;
+  opacity: 0.8;
+  text-transform: none;
+  letter-spacing: normal;
 }
 
 @media (prefers-reduced-motion: reduce) {

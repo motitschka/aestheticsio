@@ -2,11 +2,13 @@ import { useCallback, useMemo, useState } from 'react'
 import { SIZE } from '../lib/images'
 import { LESSON_LABEL, MASTERY_WAIT, type LessonState } from '../lib/progress'
 import { lessonSteps, rebuildLessonQuestion, type InfoCard, type LessonFormat, type LessonStep, type Question } from '../lib/questions'
+import type { Theme } from '../lib/theme'
 import type { Aesthetic, Entry } from '../types'
 import { Avatar } from './Avatar'
 import { Photo } from './Photo'
 import { QuestionView } from './QuestionView'
 import { StateBadge } from './StateBadge'
+import { ThemePreview } from './ThemePicker'
 
 interface Props {
   aesthetic: Aesthetic
@@ -14,14 +16,21 @@ interface Props {
   byId: Map<string, Aesthetic>
   entry: Entry | undefined
   state: LessonState
-  /** Records a finished lesson run; returns the lesson state before and after. */
-  onFinish(perfect: boolean): { before: LessonState; after: LessonState }
+  /** Records a finished lesson run; returns the lesson state before and after, and whether its theme just unlocked. */
+  onFinish(perfect: boolean): { before: LessonState; after: LessonState; unlocked: boolean }
+  /** This aesthetic's theme, offered once it unlocks. */
+  theme?: Theme
+  themeInUse: boolean
+  onUseTheme(id: string): void
   onClose(): void
 }
 
-type Phase = { k: 'choose' } | { k: 'steps'; format: LessonFormat } | { k: 'done'; format: LessonFormat; perfect: boolean; before: LessonState; after: LessonState }
+type Phase =
+  | { k: 'choose' }
+  | { k: 'steps'; format: LessonFormat }
+  | { k: 'done'; format: LessonFormat; perfect: boolean; before: LessonState; after: LessonState; unlocked: boolean }
 
-export function Lesson({ aesthetic: a, all, byId, entry, state, onFinish, onClose }: Props) {
+export function Lesson({ aesthetic: a, all, byId, entry, state, onFinish, theme, themeInUse, onUseTheme, onClose }: Props) {
   // The first time is always the full lesson; after that, info and questions are separate.
   const [phase, setPhase] = useState<Phase>(state === 'new' ? { k: 'steps', format: 'full' } : { k: 'choose' })
 
@@ -43,12 +52,14 @@ export function Lesson({ aesthetic: a, all, byId, entry, state, onFinish, onClos
           byId={byId}
           format={phase.format}
           onDone={(perfect) => {
-            const change = phase.format === 'info' ? { before: state, after: state } : onFinish(perfect)
+            const change = phase.format === 'info' ? { before: state, after: state, unlocked: false } : onFinish(perfect)
             setPhase({ k: 'done', format: phase.format, perfect, ...change })
           }}
         />
       )}
-      {phase.k === 'done' && <Done a={a} {...phase} onAgain={() => setPhase({ k: 'choose' })} onClose={onClose} />}
+      {phase.k === 'done' && (
+        <Done a={a} {...phase} theme={theme} themeInUse={themeInUse} onUseTheme={onUseTheme} onAgain={() => setPhase({ k: 'choose' })} onClose={onClose} />
+      )}
     </div>
   )
 }
@@ -257,7 +268,19 @@ function InfoView({ card, a, byId }: { card: InfoCard; a: Aesthetic; byId: Map<s
   }
 }
 
-function Done({ a, format, perfect, before, after, onAgain, onClose }: { a: Aesthetic; format: LessonFormat; perfect: boolean; before: LessonState; after: LessonState; onAgain(): void; onClose(): void }) {
+function Done({ a, format, perfect, before, after, unlocked, theme, themeInUse, onUseTheme, onAgain, onClose }: {
+  a: Aesthetic
+  format: LessonFormat
+  perfect: boolean
+  before: LessonState
+  after: LessonState
+  unlocked: boolean
+  theme?: Theme
+  themeInUse: boolean
+  onUseTheme(id: string): void
+  onAgain(): void
+  onClose(): void
+}) {
   const changed = before !== after
   let headline = 'Lesson complete'
   let text = ''
@@ -286,6 +309,22 @@ function Done({ a, format, perfect, before, after, onAgain, onClose }: { a: Aest
       <h1 className="title center">{headline}</h1>
       <StateBadge state={after} />
       <p className="muted center">{text}</p>
+      {unlocked && theme && (
+        <div className="card theme-unlocked">
+          <span style={{ width: 96, flex: 'none' }}>
+            <ThemePreview theme={theme} />
+          </span>
+          <span className="row-main">
+            <strong>Theme unlocked</strong>
+            <span className="muted small">Dress the whole app in {a.name}. Change it any time under Me.</span>
+          </span>
+        </div>
+      )}
+      {unlocked && theme && !themeInUse && (
+        <button className="btn btn-secondary" onClick={() => onUseTheme(a.id)}>
+          Use the {a.name} theme
+        </button>
+      )}
       <button className="btn btn-primary btn-big" onClick={onClose}>
         Done
       </button>

@@ -18,8 +18,12 @@ on the Aesthetics Wiki.
 - **Practice modes** (rounds of 10): image → name, name → image, description → name,
   clues → name, tell them apart (related aesthetics), odd one out, timeline. An
   aesthetic is *recognised* in a mode after 3 right in a row there.
-- **Mixed challenge:** every question type, endless until the first mistake, timed.
-  Badges for 10/25/50/100 in a row and for 25/50/100 in under 3/6/12 minutes.
+- **Mixed challenge:** every question type against the clock; one wrong answer ends
+  the run. Play it endless, or as a 25, 50 or 100 sprint. Badges for 10/25/50/100 in
+  a row and for 25/50/100 in under 3/6/12 minutes.
+- **Themes:** learning a lesson unlocks that aesthetic's theme for the whole app:
+  colours taken from its own images, a matching display font and button style, and
+  a collage of its images in the background. Pick one under **Me → Themes**.
 - **Play without signing in:** guest progress is saved in the browser.
 - **Or sign in with Google (invite only):** progress syncs across devices and you
   join the friends leaderboard (lessons % and best streak). Guest progress comes
@@ -82,6 +86,7 @@ site is guest-only.
 | `npm test` | Quiz logic tests |
 | `npm run test:rules` | Firestore security rules tests (needs Java 21+) |
 | `npm run fetch-data` | Re-download the aesthetics into `data/aesthetics.json`; commit and push to publish |
+| `npm run make-themes` | Rebuild `data/themes.json` from the images (after `fetch-data`). Fonts and button styles are hand-picked in `scripts/theme-styles.mjs` |
 | `npm run deploy:rules` | Deploy `firestore.rules` to Firebase |
 
 ## How access works
