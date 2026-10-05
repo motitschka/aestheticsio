@@ -44,20 +44,13 @@ export interface ChoiceQuestion {
 /** The lesson's checks against close relatives (see lessonSteps). */
 export type LessonCheck = 'spot' | 'odd' | 'name'
 
-export interface TypeQuestion {
-  kind: 'type-from-image' | 'type-from-description'
-  target: Aesthetic
-  image?: string
-  text?: string
-}
-
 export interface TimelineQuestion {
   kind: 'timeline'
   /** In display order (shuffled); the answer is these sorted by year. */
   items: Aesthetic[]
 }
 
-export type Question = ChoiceQuestion | TypeQuestion | TimelineQuestion
+export type Question = ChoiceQuestion | TimelineQuestion
 
 export const MODE_INFO: Record<PracticeMode, { title: string; blurb: string }> = {
   'image-to-name': { title: 'Image → name', blurb: 'See an image, pick its aesthetic' },

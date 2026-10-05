@@ -168,6 +168,7 @@ function Steps({ a, all, byId, format, onDone, onAsking }: {
           question={current.step.question}
           onAnswer={(correct) => answer((current.step as { question: Question }).question, correct)}
           onNext={next}
+          onSkip={next}
           nextLabel="Continue"
         />
       )}

@@ -59,6 +59,7 @@ export function PracticeRound({ mode, questions, onAnswer, onLesson, score, onAg
           setAnswers((a) => [...a, { question: q, correct, recognisedNow }])
         }}
         onNext={next}
+        onSkip={next}
         nextLabel={index + 1 >= questions.length ? 'See results' : 'Next'}
         onLesson={onLesson}
         showMore

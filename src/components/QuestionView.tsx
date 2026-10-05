@@ -1,8 +1,8 @@
-import { useEffect, useMemo, useRef, useState, type FormEvent, type ReactNode } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { SIZE } from '../lib/images'
-import { timelineOrder, type ChoiceQuestion, type Question, type TimelineQuestion, type TypeQuestion } from '../lib/questions'
+import { timelineOrder, type ChoiceQuestion, type Question, type TimelineQuestion } from '../lib/questions'
 import { shuffle } from '../lib/random'
-import { BLANK, matchesName } from '../lib/text'
+import { BLANK } from '../lib/text'
 import type { Aesthetic } from '../types'
 import { Photo } from './Photo'
 
@@ -20,12 +20,16 @@ interface Props {
   showMore?: boolean
   /** Number keys pick answers (desktop). Off while something else has focus. */
   keys?: boolean
+  /**
+   * Moves on without scoring. Offered when an image the question needs didn't
+   * load: a missing picture must never cost a point, a streak or a lesson.
+   */
+  onSkip?(): void
 }
 
 interface Result {
   correct: boolean
   picked?: string
-  typed?: string
   order?: string[]
 }
 
@@ -82,34 +86,35 @@ function prompt(q: Question): ReactNode {
           When did <strong>{name(q)}</strong> first appear?
         </>
       )
-    case 'type-from-image':
-      return 'Type the name of this aesthetic'
-    case 'type-from-description':
-      return 'Type the name of the aesthetic described here'
     case 'timeline':
       return 'Tap them in order, earliest first'
   }
 }
 
-export function QuestionView({ question: q, onAnswer, onNext, autoAdvanceMs = 900, nextLabel = 'Next', onLesson, showMore = false, keys = true }: Props) {
+export function QuestionView({ question: q, onAnswer, onNext, autoAdvanceMs = 900, nextLabel = 'Next', onLesson, showMore = false, keys = true, onSkip }: Props) {
   const [result, setResult] = useState<Result | null>(null)
+  // An image the question needs didn't load: it can be skipped, and an answer doesn't count.
+  const [broken, setBroken] = useState(false)
+  const unscored = broken && !!onSkip
   const nextBtn = useRef<HTMLButtonElement>(null)
+  const onImageFail = useCallback(() => setBroken(true), [])
 
   const finish = (r: Result) => {
     if (result) return
     setResult(r)
-    onAnswer(r.correct)
+    if (!unscored) onAnswer(r.correct)
   }
+  const proceed = unscored ? onSkip! : onNext
 
   useEffect(() => {
     if (!result) return
     if (result.correct && autoAdvanceMs > 0) {
-      const t = window.setTimeout(onNext, autoAdvanceMs)
+      const t = window.setTimeout(proceed, autoAdvanceMs)
       return () => window.clearTimeout(t)
     }
     nextBtn.current?.focus({ preventScroll: true })
     nextBtn.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
-  }, [result, autoAdvanceMs, onNext])
+  }, [result, autoAdvanceMs, proceed])
 
   const target = 'target' in q ? q.target : undefined
   const shown = 'image' in q ? q.image : undefined
@@ -119,15 +124,36 @@ export function QuestionView({ question: q, onAnswer, onNext, autoAdvanceMs = 90
     <div className="question">
       <p className="prompt">{prompt(q)}</p>
 
-      {(q.kind === 'type-from-image' || q.kind === 'type-from-description') && <TypeView q={q} result={result} onSubmit={(typed) => finish({ correct: matchesName(typed, q.target), typed })} />}
       {q.kind === 'timeline' && <TimelineView q={q} result={result} onSubmit={(order) => finish({ correct: order.join() === timelineOrder(q).join(), order })} />}
-      {'choices' in q && <ChoiceView q={q} result={result} keys={keys && !result} onPick={(key) => finish({ correct: key === q.answer, picked: key })} />}
+      {'choices' in q && <ChoiceView q={q} result={result} keys={keys && !result} onPick={(key) => finish({ correct: key === q.answer, picked: key })} onImageFail={onImageFail} />}
 
-      {result?.correct && autoAdvanceMs > 0 && <p className="feedback feedback-right">Correct!</p>}
+      {unscored && !result && (
+        <div className="notice notice-soft" role="status">
+          <span>An image didn’t load, so this one won’t count.</span>
+          <button className="btn btn-secondary btn-small" onClick={onSkip}>
+            Skip it
+          </button>
+        </div>
+      )}
+
+      {result?.correct && autoAdvanceMs > 0 && (
+        <p className="feedback feedback-right" role="status">
+          <span className="mark" aria-hidden>
+            ✓
+          </span>{' '}
+          Correct!
+        </p>
+      )}
 
       {result && (!result.correct || autoAdvanceMs === 0) && (
         <div className={`feedback-panel ${result.correct ? 'is-good' : ''}`}>
-          <p className={`feedback ${result.correct ? 'feedback-right' : 'feedback-wrong'}`}>{explain(q, result)}</p>
+          <p className={`feedback ${result.correct ? 'feedback-right' : 'feedback-wrong'}`} role="status">
+            <span className="mark" aria-hidden>
+              {result.correct ? '✓' : '✗'}
+            </span>{' '}
+            {explain(q, result)}
+            {unscored && <span className="muted"> This one doesn’t count: an image didn’t load.</span>}
+          </p>
           {!result.correct && showMore && target && more.length > 0 && (
             <>
               <p className="muted small">More {target.name}:</p>
@@ -150,7 +176,7 @@ export function QuestionView({ question: q, onAnswer, onNext, autoAdvanceMs = 90
               </a>
             </div>
           )}
-          <button ref={nextBtn} className="btn btn-primary" onClick={onNext}>
+          <button ref={nextBtn} className="btn btn-primary" onClick={proceed}>
             {nextLabel}
           </button>
         </div>
@@ -165,7 +191,7 @@ function explain(q: Question, r: Result): ReactNode {
     case 'name-to-image':
       return (
         <>
-          Not quite. <strong>{q.target.name}</strong> is the one in green.
+          Not quite. <strong>{q.target.name}</strong> is the one marked ✓.
         </>
       )
     case 'odd-one-out':
@@ -177,15 +203,7 @@ function explain(q: Question, r: Result): ReactNode {
     case 'pick-colours':
     case 'pick-motifs':
     case 'pick-decade':
-      return 'Not quite. The right answer is in green.'
-    case 'type-from-image':
-    case 'type-from-description':
-      return (
-        <>
-          It’s <strong>{q.target.name}</strong>
-          {r.typed ? <span className="muted">. You typed “{r.typed}”.</span> : '.'}
-        </>
-      )
+      return 'Not quite. The right answer is marked ✓.'
     case 'timeline':
       return 'Not quite. Here’s the right order.'
     default: {
@@ -200,7 +218,7 @@ function explain(q: Question, r: Result): ReactNode {
   }
 }
 
-function ChoiceView({ q, result, keys, onPick }: { q: ChoiceQuestion; result: Result | null; keys: boolean; onPick(key: string): void }) {
+function ChoiceView({ q, result, keys, onPick, onImageFail }: { q: ChoiceQuestion; result: Result | null; keys: boolean; onPick(key: string): void; onImageFail(): void }) {
   const root = useRef<HTMLDivElement>(null)
   useEffect(() => {
     if (!keys) return
@@ -225,7 +243,7 @@ function ChoiceView({ q, result, keys, onPick }: { q: ChoiceQuestion; result: Re
 
   return (
     <>
-      {q.image && <Photo key={q.image} src={q.image} width={SIZE.large} alt="Mystery aesthetic" fit="contain" className="quiz-image" />}
+      {q.image && <Photo key={q.image} src={q.image} width={SIZE.large} alt="Mystery aesthetic" fit="contain" className="quiz-image" onFail={onImageFail} />}
       {q.text && (
         <blockquote className="description">
           <Masked text={q.text} />
@@ -246,9 +264,16 @@ function ChoiceView({ q, result, keys, onPick }: { q: ChoiceQuestion; result: Re
       {images ? (
         <div className="image-choices" ref={root}>
           {q.choices.map((c, i) => (
-            <button key={c.key} className={`image-choice ${state(c.key)}`} onClick={() => onPick(c.key)} disabled={!!result} aria-label={`Option ${i + 1}`}>
-              <Photo key={c.image} src={c.image!} width={SIZE.medium} alt={result ? (c.aesthetic?.name ?? '') : `Option ${i + 1}`} />
+            <button
+              key={c.key}
+              className={`image-choice ${state(c.key)}`}
+              onClick={() => onPick(c.key)}
+              disabled={!!result}
+              aria-label={result ? `${c.aesthetic?.name ?? `Option ${i + 1}`}${mark(state(c.key))}` : `Option ${i + 1}`}
+            >
+              <Photo key={c.image} src={c.image!} width={SIZE.medium} alt={result ? (c.aesthetic?.name ?? '') : `Option ${i + 1}`} onFail={onImageFail} />
               {result && c.aesthetic && <span className="image-label">{c.aesthetic.name}</span>}
+              <Mark state={state(c.key)} />
             </button>
           ))}
         </div>
@@ -258,6 +283,7 @@ function ChoiceView({ q, result, keys, onPick }: { q: ChoiceQuestion; result: Re
             <button key={c.key} className={`choice ${state(c.key)}`} onClick={() => onPick(c.key)} disabled={!!result}>
               <span className="choice-key">{i + 1}</span>
               <span>{c.label}</span>
+              <Mark state={state(c.key)} />
             </button>
           ))}
         </div>
@@ -266,40 +292,17 @@ function ChoiceView({ q, result, keys, onPick }: { q: ChoiceQuestion; result: Re
   )
 }
 
-function TypeView({ q, result, onSubmit }: { q: TypeQuestion; result: Result | null; onSubmit(typed: string): void }) {
-  const [typed, setTyped] = useState('')
-  const submit = (e: FormEvent) => {
-    e.preventDefault()
-    if (typed.trim()) onSubmit(typed.trim())
-  }
+/** Right and wrong are marked with a sign as well as colour (not everyone tells red from green). */
+function Mark({ state }: { state: string }) {
+  if (state !== 'is-right' && state !== 'is-wrong') return null
   return (
-    <>
-      {q.image && <Photo key={q.image} src={q.image} width={SIZE.large} alt="Mystery aesthetic" fit="contain" className="quiz-image" />}
-      {q.text && (
-        <blockquote className="description">
-          <Masked text={q.text} />
-        </blockquote>
-      )}
-      <form className={`type-form ${result ? (result.correct ? 'is-right' : 'is-wrong') : ''}`} onSubmit={submit}>
-        <input
-          className="input"
-          value={typed}
-          onChange={(e) => setTyped(e.target.value)}
-          placeholder="Aesthetic name"
-          disabled={!!result}
-          autoComplete="off"
-          autoCapitalize="words"
-          spellCheck={false}
-          enterKeyHint="done"
-          aria-label="Aesthetic name"
-        />
-        <button className="btn btn-primary" disabled={!!result || !typed.trim()}>
-          Check
-        </button>
-      </form>
-    </>
+    <span className="choice-mark" aria-hidden>
+      {state === 'is-right' ? '✓' : '✗'}
+    </span>
   )
 }
+
+const mark = (state: string) => (state === 'is-right' ? ', right answer' : state === 'is-wrong' ? ', your answer' : '')
 
 function TimelineView({ q, result, onSubmit }: { q: TimelineQuestion; result: Result | null; onSubmit(order: string[]): void }) {
   const [order, setOrder] = useState<string[]>([])
@@ -326,6 +329,7 @@ function TimelineView({ q, result, onSubmit }: { q: TimelineQuestion; result: Re
                   <span className="row-name">{a.name}</span>
                   {result && <span className="muted small">{a.year}s</span>}
                 </span>
+                <Mark state={state} />
               </button>
             </li>
           )

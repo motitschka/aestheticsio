@@ -8,9 +8,11 @@ interface Props {
   fit?: 'cover' | 'contain'
   lazy?: boolean
   className?: string
+  /** Called if the image fails to load (questions then don't count it against anyone). */
+  onFail?(): void
 }
 
-export function Photo({ src, width, alt, fit = 'cover', lazy = false, className = '' }: Props) {
+export function Photo({ src, width, alt, fit = 'cover', lazy = false, className = '', onFail }: Props) {
   const [status, setStatus] = useState({ src, state: 'loading' as 'loading' | 'ok' | 'error' })
   const state = status.src === src ? status.state : 'loading'
 
@@ -27,7 +29,10 @@ export function Photo({ src, width, alt, fit = 'cover', lazy = false, className 
           draggable={false}
           style={{ objectFit: fit }}
           onLoad={() => setStatus({ src, state: 'ok' })}
-          onError={() => setStatus({ src, state: 'error' })}
+          onError={() => {
+            setStatus({ src, state: 'error' })
+            onFail?.()
+          }}
         />
       )}
     </div>

@@ -346,6 +346,62 @@ h2 {
   margin-bottom: 12px;
 }
 
+.notice-soft {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  background: var(--surface-2);
+  color: var(--text);
+}
+
+/* Right and wrong carry a sign, not only a colour. */
+.choice-mark {
+  margin-left: auto;
+  padding-left: 8px;
+  font-weight: 800;
+  font-size: 1.1rem;
+  line-height: 1;
+}
+
+.choice.is-right .choice-mark,
+.timeline-item.is-right .choice-mark {
+  color: var(--good);
+}
+
+.choice.is-wrong .choice-mark,
+.timeline-item.is-wrong .choice-mark {
+  color: var(--bad);
+}
+
+.image-choice .choice-mark {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border-radius: 999px;
+  color: #fff;
+}
+
+.image-choice.is-right .choice-mark {
+  background: var(--good);
+  color: var(--surface);
+}
+
+.image-choice.is-wrong .choice-mark {
+  background: var(--bad);
+  color: var(--surface);
+}
+
+.feedback .mark {
+  font-weight: 800;
+}
+
 .demo-banner {
   margin: -4px 0 12px;
   padding: 6px 12px;
@@ -1028,21 +1084,6 @@ button.row {
 .clues dd {
   margin: 0;
   line-height: 1.4;
-}
-
-.type-form {
-  display: flex;
-  gap: 8px;
-}
-
-.type-form.is-right .input {
-  border-color: var(--good);
-  background: var(--good-soft);
-}
-
-.type-form.is-wrong .input {
-  border-color: var(--bad);
-  background: var(--bad-soft);
 }
 
 .feedback-panel.is-good {

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import type { Aesthetic, Progress, ScoredMode } from '../types'
 import { buildMixed, buildPractice, buildRound, buildTimeline, CHOICES, eligible, lessonSteps, pickTargets, rebuildLessonQuestion, ROUND_SIZE, timelineOrder, type ChoiceQuestion } from './questions'
-import { BLANK, matchesName, maskName } from './text'
+import { BLANK, maskName } from './text'
 
 // Deterministic PRNG so failures are reproducible.
 const seeded = (seed = 1) => () => ((seed = (seed * 16807) % 2147483647) - 1) / 2147483646
@@ -195,22 +195,7 @@ describe('lessons', () => {
   })
 })
 
-describe('typed answers', () => {
-  const a: Aesthetic = { id: 'v', name: 'Vector Música', aliases: ['Idol Pop Vector'], wiki: '', images: [] }
-
-  it('ignores case, accents and punctuation, forgives small typos, accepts aliases', () => {
-    expect(matchesName('vector musica', a)).toBe(true)
-    expect(matchesName('Vektor Musica', a)).toBe(true)
-    expect(matchesName('idol-pop vector', a)).toBe(true)
-    expect(matchesName('Vector', a)).toBe(false)
-    expect(matchesName('', a)).toBe(false)
-  })
-
-  it('short names must be exact', () => {
-    expect(matchesName('8-bit', { id: 'b', name: '8-Bit', wiki: '', images: [] })).toBe(true)
-    expect(matchesName('7-bit', { id: 'b', name: '8-Bit', wiki: '', images: [] })).toBe(false)
-  })
-
+describe('masking', () => {
   it('masks names and their distinctive words, not generic ones', () => {
     const memphis: Aesthetic = { id: 'm', name: 'Memphis Design', wiki: '', images: [] }
     expect(maskName('Memphis Design was a design group in Memphis.', memphis)).toBe(`${BLANK} was a design group in ${BLANK}.`)

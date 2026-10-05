@@ -71,9 +71,24 @@ export function Challenge({ all, byId, target, onEnd, onLesson, loadRank, onAgai
     }
   }
 
-  // Leaving mid-run still counts the streak so far: no mistake was made.
+  // Leaving mid-run still counts the streak so far: no mistake was made. That
+  // includes leaving the page itself (the back gesture, closing the tab).
+  const live = useRef({ streak, splits, ended: false })
+  useEffect(() => {
+    live.current = { streak, splits, ended: live.current.ended || !!end }
+  }, [streak, splits, end])
+  const recordSoFar = useCallback(() => {
+    const { streak: s, splits: sp, ended } = live.current
+    if (ended || s === 0) return
+    live.current.ended = true
+    onEnd(s, sp)
+  }, [onEnd])
+  useEffect(() => {
+    window.addEventListener('pagehide', recordSoFar)
+    return () => window.removeEventListener('pagehide', recordSoFar)
+  }, [recordSoFar])
   const leave = () => {
-    if (!end && streak > 0) onEnd(streak, splits)
+    recordSoFar()
     onExit()
   }
 
@@ -86,6 +101,13 @@ export function Challenge({ all, byId, target, onEnd, onLesson, loadRank, onAgai
       window.scrollTo({ top: 0 })
     }
   }, [end, question, all, byId])
+
+  // A question whose image didn't load is swapped for another; the run goes on.
+  const skip = useCallback(() => {
+    recent.current = [targetId(question), ...recent.current].slice(0, 20)
+    setQuestion(freshQuestion(all, byId, recent.current))
+    setCount((c) => c + 1)
+  }, [question, all, byId])
 
   if (end && showResults)
     return <ChallengeResults target={target} streak={streak} time={end.time} splits={splits} missed={end.missed} outcome={end.outcome} onLesson={onLesson} loadRank={loadRank} onAgain={onAgain} onExit={onExit} />
@@ -101,7 +123,7 @@ export function Challenge({ all, byId, target, onEnd, onLesson, loadRank, onAgai
         </span>
         <span className="challenge-timer tabular">{formatTime((end?.time ?? now - startedAt) | 0)}</span>
       </div>
-      <QuestionView key={count} question={question} onAnswer={answer} onNext={next} autoAdvanceMs={450} nextLabel="See results" />
+      <QuestionView key={count} question={question} onAnswer={answer} onNext={next} onSkip={skip} autoAdvanceMs={450} nextLabel="See results" />
     </section>
   )
 }
