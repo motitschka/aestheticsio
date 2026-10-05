@@ -80,6 +80,10 @@ export function IntroScreen({ scene, theme, a, all, byId, saved, now, themeFor, 
               before="new"
               after="learned"
               unlocked
+              goalMet={false}
+              freezeEarned={false}
+              dayStreak={0}
+              erasFinished={[]}
               theme={themeFor}
               themeInUse={scene.themeInUse}
               onUseTheme={onUseTheme}
@@ -101,6 +105,7 @@ export function IntroScreen({ scene, theme, a, all, byId, saved, now, themeFor, 
               onChallengeEnd={noOutcome}
               onLesson={noop}
               onRoundActive={noop}
+              onDismissNote={noop}
             />
             <nav className="tabbar">
               <Tab icon="play" label="Play" on />

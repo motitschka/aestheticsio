@@ -1,4 +1,5 @@
 import type { Aesthetic, PracticeMode, Progress, ScoredMode } from '../types'
+import { eraOf } from './eras'
 import { practiceStatus } from './progress'
 import { pickOne, sample, shuffle, type Rng } from './random'
 import { maskName, normalizeName } from './text'
@@ -36,7 +37,12 @@ export interface ChoiceQuestion {
   odd?: Aesthetic
   choices: Choice[]
   answer: string
+  /** Lesson checks: the lesson's aesthetic and which check this is, so a missed one can be asked afresh. */
+  lesson?: { of: Aesthetic; check: LessonCheck }
 }
+
+/** The lesson's checks against close relatives (see lessonSteps). */
+export type LessonCheck = 'spot' | 'odd' | 'name'
 
 export interface TypeQuestion {
   kind: 'type-from-image' | 'type-from-description'
@@ -203,19 +209,86 @@ export function buildMixed(all: readonly Aesthetic[], byId: Map<string, Aestheti
 
 // ---------- lessons ----------
 
+/**
+ * Images the player hasn't seen in the lesson: the published Pinterest pins
+ * (the lesson's gallery shows the wiki's photos), or the wiki's when there are none.
+ */
+const unseen = (a: Aesthetic) => (a.pins?.length ? a.pins : a.images)
+
+/**
+ * Its closest relatives in the set, the ones worth telling apart: the wiki's
+ * "similar" list first, then others from the same era.
+ */
+export function relativesOf(a: Aesthetic, all: readonly Aesthetic[], n: number, rng: Rng = Math.random): Aesthetic[] {
+  const byId = new Map(all.map((x) => [x.id, x]))
+  const similar = (a.similar ?? []).map((id) => byId.get(id)).filter((x): x is Aesthetic => !!x && x.id !== a.id && unseen(x).length > 0)
+  const picked = sample(similar.slice(0, Math.max(n + 2, 5)), n, rng)
+  if (picked.length < n) {
+    const era = eraOf(a)
+    const sameEra = all.filter((x) => x.id !== a.id && !picked.includes(x) && eraOf(x) === era && unseen(x).length > 0)
+    picked.push(...sample(sameEra, n - picked.length, rng))
+  }
+  if (picked.length < n) picked.push(...randomOthers(a, all, n - picked.length, rng, (x) => !picked.includes(x) && unseen(x).length > 0))
+  return picked
+}
+
+/** "Which one is X?": one unseen image of it among images of its relatives. */
+function spotCheck(a: Aesthetic, all: readonly Aesthetic[], rng: Rng): ChoiceQuestion | null {
+  if (!unseen(a).length) return null
+  const options = shuffle([a, ...relativesOf(a, all, CHOICES - 1, rng)], rng)
+  return {
+    kind: 'name-to-image',
+    target: a,
+    choices: options.map((x) => ({ key: x.id, image: pickOne(unseen(x), rng), aesthetic: x })),
+    answer: a.id,
+    lesson: { of: a, check: 'spot' },
+  }
+}
+
+/** Three unseen images of it and one of a close relative: which doesn't belong? */
+function oddCheck(a: Aesthetic, all: readonly Aesthetic[], rng: Rng): ChoiceQuestion | null {
+  if (unseen(a).length < 3) return null
+  const odd = relativesOf(a, all, 1, rng)[0]
+  if (!odd) return null
+  const same = sample(unseen(a), 3, rng).map((image, i) => ({ key: `same${i}`, image, aesthetic: a }))
+  const oddChoice = { key: 'odd', image: pickOne(unseen(odd), rng), aesthetic: odd }
+  return { kind: 'odd-one-out', target: a, odd, choices: shuffle([...same, oddChoice], rng), answer: 'odd', lesson: { of: a, check: 'odd' } }
+}
+
+/** An unseen image that may be it or one of its relatives: which is it? */
+function nameCheck(a: Aesthetic, all: readonly Aesthetic[], rng: Rng): ChoiceQuestion | null {
+  const relatives = relativesOf(a, all, CHOICES - 1, rng)
+  // Half the time the image is a relative's, so knowing which lesson this is doesn't give it away.
+  const shown = rng() < 0.5 || !relatives.length ? a : pickOne(relatives, rng)
+  if (!unseen(shown).length) return null
+  const options = shuffle([a, ...relatives], rng)
+  return { kind: 'tell-apart', target: shown, image: pickOne(unseen(shown), rng), choices: options.map(nameChoice), answer: shown.id, lesson: { of: a, check: 'name' } }
+}
+
+const CHECKS: Record<LessonCheck, (a: Aesthetic, all: readonly Aesthetic[], rng: Rng) => ChoiceQuestion | null> = {
+  spot: spotCheck,
+  odd: oddCheck,
+  name: nameCheck,
+}
+
 const overlap = (a: string[], b: string[]) => {
   const x = new Set(a.map((s) => s.toLowerCase()))
   const shared = b.filter((s) => x.has(s.toLowerCase())).length
   return shared / Math.min(a.length, b.length)
 }
 
-/** "Which are its colours/motifs?": the other options are other aesthetics' lists that differ enough. */
+/**
+ * "Which are its colours/motifs?": the other options are other aesthetics' lists
+ * that differ enough, its close relatives' first.
+ */
 function pickList(kind: 'pick-colours' | 'pick-motifs', target: Aesthetic, all: readonly Aesthetic[], rng: Rng): ChoiceQuestion | null {
   const field = kind === 'pick-colours' ? 'colours' : 'motifs'
   const n = kind === 'pick-colours' ? 4 : 3
   const mine = target[field]?.slice(0, n)
   if (!mine || mine.length < 2) return null
-  const pool = shuffle(all, rng).filter((a) => a.id !== target.id && (a[field]?.length ?? 0) >= 2)
+  const relatives = relativesOf(target, all, 6, rng)
+  const rest = shuffle(all, rng).filter((a) => !relatives.includes(a))
+  const pool = [...relatives, ...rest].filter((a) => a.id !== target.id && (a[field]?.length ?? 0) >= 2)
   const others: string[][] = []
   for (const a of pool) {
     const list = a[field]!.slice(0, n)
@@ -227,11 +300,22 @@ function pickList(kind: 'pick-colours' | 'pick-motifs', target: Aesthetic, all: 
   return { kind, target, choices, answer: 'answer' }
 }
 
-function pickDecade(target: Aesthetic, rng: Rng): ChoiceQuestion | null {
+/** "When did it first appear?": its relatives' decades where they differ, then nearby ones. */
+function pickDecade(target: Aesthetic, all: readonly Aesthetic[], rng: Rng): ChoiceQuestion | null {
   if (target.year === undefined) return null
-  const near = [-40, -30, -20, -10, 10, 20, 30, 40].map((d) => target.year! + d).filter((y) => y >= 1800 && y <= 2020)
-  const options = shuffle([target.year, ...sample(near, CHOICES - 1, rng)], rng)
-  return { kind: 'pick-decade', target, choices: options.map((y) => ({ key: String(y), label: `${y}s` })), answer: String(target.year) }
+  const year = target.year
+  const fromRelatives = relativesOf(target, all, 6, rng)
+    .map((a) => a.year)
+    .filter((y): y is number => y !== undefined && y !== year && y >= 1600)
+  const near = [-30, -20, -10, 10, 20, 30].map((d) => year + d).filter((y) => y <= 2020)
+  const options: number[] = []
+  for (const y of [...shuffle([...new Set(fromRelatives)], rng), ...shuffle(near, rng)]) {
+    if (options.length === CHOICES - 1) break
+    if (!options.includes(y) && y !== year) options.push(y)
+  }
+  if (options.length < CHOICES - 1) return null
+  const choices = shuffle([year, ...options], rng).sort((x, y) => x - y)
+  return { kind: 'pick-decade', target, choices: choices.map((y) => ({ key: String(y), label: `${y}s` })), answer: String(year) }
 }
 
 export type InfoCard = 'intro' | 'gallery' | 'look' | 'facts' | 'related'
@@ -241,28 +325,34 @@ export type LessonFormat = 'full' | 'info' | 'questions'
 /** Builds a fresh question for a lesson step (used again when retrying a missed one). */
 export function rebuildLessonQuestion(q: Question, all: readonly Aesthetic[], rng: Rng = Math.random): Question {
   if (q.kind === 'pick-colours' || q.kind === 'pick-motifs') return pickList(q.kind, q.target, all, rng) ?? q
-  if (q.kind === 'pick-decade') return pickDecade(q.target, rng) ?? q
-  if (q.kind === 'type-from-image') return { ...q, image: pickOne(q.target.images, rng) }
+  if (q.kind === 'pick-decade') return pickDecade(q.target, all, rng) ?? q
+  if ('lesson' in q && q.lesson) return CHECKS[q.lesson.check](q.lesson.of, all, rng) ?? q
   return q
 }
 
+/**
+ * A lesson: what the aesthetic is, what it looks like, its facts and its
+ * relatives, with checks along the way. The checks are about telling it apart
+ * from its close relatives on images the lesson hasn't shown.
+ */
 export function lessonSteps(a: Aesthetic, all: readonly Aesthetic[], format: LessonFormat, rng: Rng = Math.random): LessonStep[] {
   const info = (card: InfoCard): LessonStep => ({ type: 'info', card })
   const question = (q: Question | null): LessonStep[] => (q ? [{ type: 'question', question: q }] : [])
-  const text = description(a)
   const steps: LessonStep[] = [
     info('intro'),
     info('gallery'),
-    ...question({ kind: 'type-from-image', target: a, image: pickOne(a.images, rng) }),
+    ...question(spotCheck(a, all, rng)),
     ...(a.motifs?.length || a.colours?.length ? [info('look')] : []),
     ...question(pickList('pick-colours', a, all, rng)),
     ...question(pickList('pick-motifs', a, all, rng)),
     ...(a.decade || a.origin || a.values?.length ? [info('facts')] : []),
-    ...question(pickDecade(a, rng)),
+    ...question(pickDecade(a, all, rng)),
     ...(a.related?.length ? [info('related')] : []),
-    ...question(text.length >= MIN_DESCRIPTION ? { kind: 'type-from-description', target: a, text } : null),
+    ...question(oddCheck(a, all, rng)),
+    ...question(nameCheck(a, all, rng)),
   ]
   if (format === 'info') return steps.filter((s) => s.type === 'info')
   if (format === 'questions') return steps.filter((s) => s.type === 'question')
   return steps
 }
+

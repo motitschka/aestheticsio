@@ -59,17 +59,17 @@ describe('lessons', () => {
     expect(applyLesson(learned, true, now + MASTERY_WAIT).lt).toBe(3)
   })
 
-  it('learned drops to seen on a mistake; relearning restarts the 30 days', () => {
-    const dropped = applyLesson({ lt: 2, la: now, c: 0, w: 0, t: 0 }, false, now + 40 * DAY)
-    expect(dropped.lt).toBe(1)
-    const relearned = applyLesson(dropped, true, now + 41 * DAY)
-    expect(relearned).toMatchObject({ lt: 2, la: now + 41 * DAY })
-    expect(lessonState(relearned, now + 50 * DAY)).toBe('learned')
+  it('learned is never lost: a mistake only restarts its month before mastery', () => {
+    const missed = applyLesson({ lt: 2, la: now, u: 1, c: 0, w: 0, t: 0 }, false, now + 40 * DAY)
+    expect(missed).toMatchObject({ lt: 2, la: now + 40 * DAY, u: 1 })
+    expect(lessonState(missed, now + 50 * DAY)).toBe('learned')
+    expect(lessonState(missed, now + 70 * DAY)).toBe('ready')
   })
 
-  it('the theme stays unlocked when the lesson drops back to seen', () => {
-    const dropped = applyLesson(applyLesson(undefined, true, now), false, now + DAY)
-    expect(dropped).toMatchObject({ lt: 1, u: 1 })
+  it('a first try with mistakes is seen; the theme waits for learned', () => {
+    const seen = applyLesson(undefined, false, now)
+    expect(seen).toMatchObject({ lt: 1 })
+    expect(seen.u).toBeUndefined()
     expect(normalizeSaved({ items: { a: { lt: 2, c: 0, w: 0, t: 0 } } }).items.a.u).toBe(1)
   })
 

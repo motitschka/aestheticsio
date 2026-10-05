@@ -16,6 +16,7 @@ import {
   getDoc,
   getDocs,
   initializeFirestore,
+  onSnapshot,
   persistentLocalCache,
   persistentMultipleTabManager,
   serverTimestamp,
@@ -29,6 +30,9 @@ import { NoAccessError, type Backend } from './types'
 const env = import.meta.env
 
 const denied = (err: unknown) => err instanceof FirestoreError && err.code === 'permission-denied'
+
+/** Profile fields added with the journey through time; older Firestore rules refuse them. */
+const JOURNEY_FIELDS = ['eras', 'dayStreak', 'goalDay', 'freezes', 'recent'] as const
 
 export function createFirebaseBackend(): Backend {
   const app = initializeApp({
@@ -90,7 +94,7 @@ export function createFirebaseBackend(): Backend {
     },
 
     async saveProfile(profile) {
-      await setDoc(doc(db, 'profiles', profile.uid), profileDoc(profile))
+      await withOldRules(profile, (p) => setDoc(doc(db, 'profiles', p.uid), profileDoc(p)))
     },
 
     async loadProgress(uid) {
@@ -104,10 +108,35 @@ export function createFirebaseBackend(): Backend {
     },
 
     async saveProgress(uid, patch, profile) {
-      const batch = writeBatch(db)
-      batch.set(doc(db, 'progress', uid), patch, { merge: true })
-      if (profile) batch.set(doc(db, 'profiles', uid), profileDoc(profile))
-      await batch.commit()
+      await withOldRules(profile, (p) => {
+        const batch = writeBatch(db)
+        batch.set(doc(db, 'progress', uid), patch, { merge: true })
+        if (p) batch.set(doc(db, 'profiles', uid), profileDoc(p))
+        return batch.commit()
+      })
+    },
+
+    async startFresh(uid, next, backup, profile) {
+      await withOldRules(profile, (p) => {
+        const batch = writeBatch(db)
+        // No merge: the old items go; the backup keeps them (only its owner can read it).
+        batch.set(doc(db, 'progress', uid), { ...next, backupV1: { ...backup, at: Date.now() } })
+        if (p) batch.set(doc(db, 'profiles', uid), profileDoc(p))
+        return batch.commit()
+      })
+    },
+
+    watchProgress(uid, cb) {
+      return onSnapshot(
+        doc(db, 'progress', uid),
+        (snap) => {
+          // Our own writes come back too; only what the server has confirmed counts.
+          if (!snap.metadata.hasPendingWrites) cb(normalizeSaved(snap.data() ?? {}))
+        },
+        () => {
+          // Offline or signed out: the next save or reload catches up.
+        },
+      )
     },
 
     async listProfiles() {
@@ -123,6 +152,29 @@ export function createFirebaseBackend(): Backend {
     async setAllowlist(emails) {
       await setDoc(allowlistRef, { emails })
     },
+  }
+}
+
+/**
+ * Until the owner deploys the journey's Firestore rules, the old ones refuse
+ * the new profile fields. Then saves go on without them (friends just don't
+ * see era strips yet), rather than failing.
+ */
+let oldRules = false
+async function withOldRules<T extends Profile | null>(profile: T, write: (p: T) => Promise<unknown>) {
+  const strip = (p: T): T => {
+    if (!p) return p
+    const copy = { ...p } as Profile
+    for (const key of JOURNEY_FIELDS) delete copy[key]
+    return copy as T
+  }
+  if (oldRules) return void (await write(strip(profile)))
+  try {
+    await write(profile)
+  } catch (err) {
+    if (!denied(err) || !profile || !JOURNEY_FIELDS.some((k) => k in profile)) throw err
+    await write(strip(profile))
+    oldRules = true
   }
 }
 
@@ -142,5 +194,12 @@ function toProfile(uid: string, d: Record<string, unknown>): Profile {
     answered: Number(d.answered ?? 0),
   }
   for (const key of ['best25', 'best50', 'best100'] as const) if (typeof d[key] === 'number') p[key] = d[key]
+  if (Array.isArray(d.eras)) p.eras = d.eras.map(Number)
+  if (typeof d.goalDay === 'string') {
+    p.goalDay = d.goalDay
+    p.dayStreak = Number(d.dayStreak ?? 0)
+    p.freezes = Number(d.freezes ?? 0)
+  }
+  if (Array.isArray(d.recent)) p.recent = d.recent as Profile['recent']
   return p
 }

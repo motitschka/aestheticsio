@@ -1,23 +1,23 @@
 import { useMemo, useState } from 'react'
+import { ERAS, eraOf, eraProgress, journeyOrder } from '../lib/eras'
 import { SIZE } from '../lib/images'
-import { lessonPoints, lessonState, overallPercent, type LessonState } from '../lib/progress'
+import { lessonState } from '../lib/progress'
 import type { Aesthetic, Progress } from '../types'
+import { EraStrip } from './Journey'
 import { Moodboard } from './Moodboard'
 import { Photo } from './Photo'
 import { StateBadge } from './StateBadge'
 
-type Filter = 'all' | 'new' | 'seen' | 'learned' | 'mastered'
+type Filter = 'all' | 'new' | 'seen' | 'ready' | 'learned' | 'mastered'
 
 const FILTERS: { id: Filter; label: string }[] = [
   { id: 'all', label: 'All' },
   { id: 'new', label: 'New' },
   { id: 'seen', label: 'Seen' },
+  { id: 'ready', label: 'To master' },
   { id: 'learned', label: 'Learned' },
   { id: 'mastered', label: 'Mastered' },
 ]
-
-// "Ready to master" lessons are still learned.
-const group = (s: LessonState): Filter => (s === 'ready' ? 'learned' : s)
 
 interface Props {
   aesthetics: Aesthetic[]
@@ -32,24 +32,25 @@ export function ProgressView({ aesthetics, items, now, onLesson }: Props) {
 
   const states = useMemo(() => new Map(aesthetics.map((a) => [a.id, lessonState(items[a.id], now)])), [aesthetics, items, now])
   const counts = useMemo(() => {
-    const c: Record<Filter, number> = { all: aesthetics.length, new: 0, seen: 0, learned: 0, mastered: 0 }
-    for (const s of states.values()) c[group(s)]++
+    const c: Record<Filter, number> = { all: aesthetics.length, new: 0, seen: 0, ready: 0, learned: 0, mastered: 0 }
+    for (const s of states.values()) c[s as Filter]++
     return c
   }, [aesthetics.length, states])
+  const eras = useMemo(() => eraProgress(aesthetics, items), [aesthetics, items])
+  const ordered = useMemo(() => journeyOrder(aesthetics), [aesthetics])
 
-  const pct = overallPercent(lessonPoints(items), aesthetics.length)
   const q = query.trim().toLowerCase()
-  const shown = aesthetics.filter((a) => (filter === 'all' || group(states.get(a.id)!) === filter) && (!q || a.name.toLowerCase().includes(q)))
+  const shown = ordered.filter((a) => (filter === 'all' || states.get(a.id) === filter) && (!q || a.name.toLowerCase().includes(q)))
+  const learned = eras.reduce((n, e) => n + e.learned, 0)
 
   return (
     <section className="page">
       <Moodboard from={4} />
       <h1 className="title">Lessons</h1>
-      <div className="bar bar-200" aria-hidden>
-        <div className="bar-fill" style={{ width: `${Math.min(pct, 200) / 2}%` }} />
-      </div>
+      <EraStrip learned={eras.map((e) => e.learned)} totals={eras.map((e) => e.total)} labels />
       <p className="muted small">
-        {pct}% · {counts.learned} learned · {counts.mastered} mastered. Tap an aesthetic to take its lesson.
+        {learned} of {aesthetics.length} learned{counts.mastered ? ` · ${counts.mastered} mastered` : ''}. The journey runs through eight eras,
+        oldest first; tap any aesthetic to take its lesson.
       </p>
 
       <input className="input" type="search" placeholder="Search aesthetics" value={query} onChange={(e) => setQuery(e.target.value)} />
@@ -61,21 +62,37 @@ export function ProgressView({ aesthetics, items, now, onLesson }: Props) {
         ))}
       </div>
 
-      <ul className="list">
-        {shown.map((a) => (
-          <li key={a.id} className="list-item">
-            <button className="row" onClick={() => onLesson(a)}>
-              <Photo src={a.images[0]} width={SIZE.small} alt="" lazy className="row-thumb" />
-              <span className="row-main">
-                <span className="row-name">{a.name}</span>
-                {a.decade && <span className="muted small">{a.decade}</span>}
+      {ERAS.map((era, i) => {
+        const inEra = shown.filter((a) => eraOf(a) === i)
+        if (!inEra.length) return null
+        const p = eras[i]
+        return (
+          <section key={era.short} className="era-group" aria-label={era.label}>
+            <h2 className="era-heading">
+              <span>{era.label}</span>
+              <span className={`small tabular ${p.learned === p.total ? 'era-done' : 'muted'}`}>
+                {p.learned === p.total ? 'Done · ' : ''}
+                {p.learned}/{p.total}
               </span>
-              <StateBadge state={states.get(a.id)!} />
-            </button>
-          </li>
-        ))}
-        {shown.length === 0 && <li className="muted center empty">Nothing here.</li>}
-      </ul>
+            </h2>
+            <ul className="list">
+              {inEra.map((a) => (
+                <li key={a.id} className="list-item">
+                  <button className="row" onClick={() => onLesson(a)}>
+                    <Photo src={a.images[0]} width={SIZE.small} alt="" lazy className="row-thumb" />
+                    <span className="row-main">
+                      <span className="row-name">{a.name}</span>
+                      {a.decade && <span className="muted small">{a.decade}</span>}
+                    </span>
+                    <StateBadge state={states.get(a.id)!} />
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </section>
+        )
+      })}
+      {shown.length === 0 && <p className="muted center empty">Nothing here.</p>}
     </section>
   )
 }

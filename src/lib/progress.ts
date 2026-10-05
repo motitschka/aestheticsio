@@ -1,4 +1,5 @@
-import type { Entry, PlayerStats, Profile, Progress, SavedProgress, ScoredMode, Tier } from '../types'
+import type { Aesthetic, CircleEvent, Entry, PlayerStats, Profile, Progress, SavedProgress, ScoredMode, Tier } from '../types'
+import { eraCounts } from './eras'
 
 /** Right answers in a row for an aesthetic to count as recognised in a practice mode. */
 export const RECOGNISE_STREAK = 3
@@ -54,15 +55,118 @@ export function lessonState(e: Entry | undefined, now: number): LessonState {
 
 /**
  * A finished lesson (first time, or questions only). Perfect = every question
- * right the first time. Mastered never drops; learned drops to seen on a mistake.
+ * right the first time. Learned and mastered are never lost: a mistake on a
+ * learned lesson only restarts its month before it can be mastered.
  */
 export function applyLesson(prev: Entry | undefined, perfect: boolean, now: number): Entry {
   const e = prev ?? emptyEntry()
   if (e.lt === 3) return e
+  if (e.lt === 2) {
+    if (!perfect) return { ...e, la: now }
+    return e.la !== undefined && now - e.la >= MASTERY_WAIT ? { ...e, lt: 3 } : e
+  }
   if (!perfect) return { ...e, lt: 1 }
-  if (e.lt === 2) return e.la !== undefined && now - e.la >= MASTERY_WAIT ? { ...e, lt: 3 } : e
   return { ...e, lt: 2, la: now, u: 1 }
 }
+
+// ---------- the journey and the daily goal ----------
+
+/** The journey through time (version 2). Progress from before it is reset once, with a backup. */
+export const JOURNEY = 2
+/** Lessons a day that keep the day streak going */
+export const DAILY_GOAL = 1
+/** Doing twice the goal in a day banks a freeze, up to this many */
+export const MAX_FREEZES = 2
+/** How many moments each player keeps for the circle feed */
+export const RECENT = 6
+
+const pad = (n: number) => String(n).padStart(2, '0')
+
+/** The local calendar day, as YYYY-MM-DD. */
+export function dayKey(ms: number) {
+  const d = new Date(ms)
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
+}
+
+/** Whole days from day a to day b (YYYY-MM-DD). */
+export function daysBetween(a: string, b: string) {
+  const utc = (k: string) => {
+    const [y, m, d] = k.split('-').map(Number)
+    return Date.UTC(y, m - 1, d)
+  }
+  return Math.round((utc(b) - utc(a)) / DAY)
+}
+
+export const lessonsToday = (s: Pick<PlayerStats, 'today'>, now: number) => (s.today?.d === dayKey(now) ? s.today.n : 0)
+
+/**
+ * The day streak as it stands now. It survives missed days as long as there
+ * are freezes to cover them (they're used up when the goal is next met).
+ */
+export function dayStreakNow(s: Pick<PlayerStats, 'goalDay' | 'dayStreak' | 'freezes'>, now: number): number {
+  if (!s.goalDay || !s.dayStreak) return 0
+  const missed = daysBetween(s.goalDay, dayKey(now)) - 1
+  return missed <= (s.freezes ?? 0) ? s.dayStreak : 0
+}
+
+/** Freezes that will be used up to keep the streak alive when the goal is next met. */
+export function freezesNeeded(s: Pick<PlayerStats, 'goalDay'>, now: number) {
+  return s.goalDay ? Math.max(0, daysBetween(s.goalDay, dayKey(now)) - 1) : 0
+}
+
+export interface DailyOutcome {
+  stats: PlayerStats
+  /** The goal was met just now (the first lesson of the day) */
+  goalMet: boolean
+  freezeEarned: boolean
+}
+
+/** Counts a finished lesson toward today's goal, the day streak and freezes. */
+export function applyDailyLesson(stats: PlayerStats, now: number): DailyOutcome {
+  const d = dayKey(now)
+  const n = lessonsToday(stats, now) + 1
+  const next: PlayerStats = { ...stats, today: { d, n } }
+  let goalMet = false
+  let freezeEarned = false
+  if (n === DAILY_GOAL && stats.goalDay !== d) {
+    let streak = 1
+    let freezes = stats.freezes ?? 0
+    if (stats.goalDay) {
+      const missed = daysBetween(stats.goalDay, d) - 1
+      if (missed === 0) streak = (stats.dayStreak ?? 0) + 1
+      else if (missed > 0 && missed <= freezes) {
+        freezes -= missed
+        streak = (stats.dayStreak ?? 0) + 1
+      }
+    }
+    next.goalDay = d
+    next.dayStreak = streak
+    next.bestDayStreak = Math.max(stats.bestDayStreak ?? 0, streak)
+    next.freezes = freezes
+    goalMet = true
+  }
+  if (n === DAILY_GOAL * 2 && (next.freezes ?? 0) < MAX_FREEZES) {
+    next.freezes = (next.freezes ?? 0) + 1
+    freezeEarned = true
+  }
+  return { stats: next, goalMet, freezeEarned }
+}
+
+/** Adds moments to the circle feed (newest first, the latest few kept). */
+export const withRecent = (stats: PlayerStats, events: CircleEvent[]): PlayerStats =>
+  events.length ? { ...stats, recent: [...events, ...(stats.recent ?? [])].slice(0, RECENT) } : stats
+
+/** Progress made before the journey through time; it's reset once (see freshStart). */
+export const needsFreshStart = (s: SavedProgress) => s.stats.v !== JOURNEY
+
+export const hasProgress = (p: SavedProgress) =>
+  Object.keys(p.items).length > 0 || p.stats.timelineTotal > 0 || p.stats.bestStreak > 0 || !!p.stats.theme
+
+/** Everyone starts the journey fresh: an empty record (the caller keeps a backup of the old one). */
+export const freshStart = (hadProgress: boolean): SavedProgress => ({
+  items: {},
+  stats: { ...emptyStats(), v: JOURNEY, ...(hadProgress ? { journeyNote: 1 as const } : {}) },
+})
 
 const tierPoints = (lt: Tier | undefined) => (lt === 3 ? 2 : lt === 2 ? 1 : 0)
 
@@ -135,20 +239,33 @@ export function practiceTotals(items: Progress) {
   return { correct, answered }
 }
 
-export function profileFrom(base: Pick<Profile, 'uid' | 'nickname' | 'avatar'>, saved: SavedProgress): Profile {
+export function profileFrom(base: Pick<Profile, 'uid' | 'nickname' | 'avatar'>, saved: SavedProgress, all: readonly Aesthetic[]): Profile {
   const { stats } = saved
   const p: Profile = { ...base, lessonPoints: lessonPoints(saved.items), bestStreak: stats.bestStreak, ...practiceTotals(saved.items) }
   for (const m of MILESTONES) {
     const t = stats[bestKey(m)]
     if (t !== undefined) p[bestKey(m)] = t
   }
+  if (all.length) p.eras = eraCounts(all, saved.items)
+  if (stats.goalDay) {
+    p.goalDay = stats.goalDay
+    p.dayStreak = stats.dayStreak ?? 0
+    p.freezes = stats.freezes ?? 0
+  }
+  if (stats.recent?.length) p.recent = stats.recent
   return p
 }
 
+/** Lessons learned (or mastered), from a profile's era counts. */
+export const learnedCount = (p: Pick<Profile, 'eras'>) => (p.eras ?? []).reduce((n, x) => n + x, 0)
+
 export const accuracy = (p: { correct: number; answered: number }) => (p.answered ? p.correct / p.answered : 0)
 
+/** Most learned first, then most mastered (lesson points count mastered twice). */
 export const rankByLessons = (profiles: readonly Profile[]) =>
-  [...profiles].sort((a, b) => b.lessonPoints - a.lessonPoints || accuracy(b) - accuracy(a) || a.nickname.localeCompare(b.nickname))
+  [...profiles].sort(
+    (a, b) => learnedCount(b) - learnedCount(a) || b.lessonPoints - a.lessonPoints || accuracy(b) - accuracy(a) || a.nickname.localeCompare(b.nickname),
+  )
 
 export const rankByStreak = (profiles: readonly Profile[]) =>
   [...profiles].sort(
@@ -192,6 +309,30 @@ function mergeEntry(a: Entry, b: Entry): Entry {
   return e
 }
 
+/** The daily-goal fields of whichever record met its goal last. */
+function laterDaily(a: PlayerStats, b: PlayerStats): Partial<PlayerStats> {
+  const pick = (b.goalDay ?? '') > (a.goalDay ?? '') ? b : a
+  const out: Partial<PlayerStats> = {}
+  if (pick.goalDay) {
+    out.goalDay = pick.goalDay
+    out.dayStreak = pick.dayStreak
+    out.freezes = pick.freezes
+  }
+  const best = Math.max(a.bestDayStreak ?? 0, b.bestDayStreak ?? 0)
+  if (best) out.bestDayStreak = best
+  const today = (b.today?.d ?? '') > (a.today?.d ?? '') ? b.today : (a.today?.d ?? '') > (b.today?.d ?? '') ? a.today : a.today && b.today ? { d: a.today.d, n: Math.max(a.today.n, b.today.n) } : (a.today ?? b.today)
+  if (today) out.today = today
+  return out
+}
+
+const eventKey = (e: CircleEvent) => `${e.k}:${e.k === 'learned' ? e.id : e.e}:${e.t}`
+
+function mergeRecent(a: CircleEvent[] = [], b: CircleEvent[] = []): CircleEvent[] | undefined {
+  const seen = new Set<string>()
+  const out = [...a, ...b].filter((e) => !seen.has(eventKey(e)) && seen.add(eventKey(e))).sort((x, y) => y.t - x.t).slice(0, RECENT)
+  return out.length ? out : undefined
+}
+
 /** Combines guest progress into an account's. */
 export function mergeSaved(account: SavedProgress, guest: SavedProgress): SavedProgress {
   const items = { ...account.items }
@@ -202,6 +343,7 @@ export function mergeSaved(account: SavedProgress, guest: SavedProgress): SavedP
     timelineRight: a.timelineRight + g.timelineRight,
     timelineTotal: a.timelineTotal + g.timelineTotal,
     bestStreak: Math.max(a.bestStreak, g.bestStreak),
+    ...laterDaily(a, g),
   }
   const theme = a.theme || g.theme
   if (theme) stats.theme = theme
@@ -210,5 +352,51 @@ export function mergeSaved(account: SavedProgress, guest: SavedProgress): SavedP
     const t = Math.min(a[key] ?? Infinity, g[key] ?? Infinity)
     if (t !== Infinity) stats[key] = t
   }
+  if (a.v === JOURNEY || g.v === JOURNEY) stats.v = JOURNEY
+  if (a.journeyNote || g.journeyNote) stats.journeyNote = a.journeyNote === 0 || g.journeyNote === 0 ? 0 : 1
+  const recent = mergeRecent(a.recent, g.recent)
+  if (recent) stats.recent = recent
+  return { items, stats }
+}
+
+/** One aesthetic's progress, as the same record seen from two devices: nothing goes backwards. */
+function syncEntry(local: Entry, remote: Entry): Entry {
+  const newer = remote.t >= local.t ? remote : local
+  const tierOwner = (local.lt ?? 0) > (remote.lt ?? 0) ? local : remote
+  const e: Entry = { c: Math.max(local.c, remote.c), w: Math.max(local.w, remote.w), t: Math.max(local.t, remote.t) }
+  if (newer.m) e.m = newer.m
+  if (tierOwner.lt) e.lt = tierOwner.lt
+  if (tierOwner.la !== undefined) e.la = tierOwner.la
+  if (local.u || remote.u) e.u = 1
+  return e
+}
+
+/**
+ * The account as this device has it, updated with what the server has (written
+ * by another device, or this one). Records only move forward, so a device
+ * that was left open with old data can't roll anything back.
+ */
+export function syncMerge(local: SavedProgress, remote: SavedProgress): SavedProgress {
+  // A fresh start on the server (or here) wins over older records.
+  if (remote.stats.v === JOURNEY && local.stats.v !== JOURNEY) return remote
+  if (local.stats.v === JOURNEY && remote.stats.v !== JOURNEY) return local
+  const items: Progress = { ...remote.items }
+  for (const [id, e] of Object.entries(local.items)) items[id] = items[id] ? syncEntry(e, items[id]) : e
+  const l = local.stats
+  const r = remote.stats
+  const stats: PlayerStats = {
+    ...r,
+    timelineRight: Math.max(l.timelineRight, r.timelineRight),
+    timelineTotal: Math.max(l.timelineTotal, r.timelineTotal),
+    bestStreak: Math.max(l.bestStreak, r.bestStreak),
+    ...laterDaily(l, r),
+  }
+  for (const m of MILESTONES) {
+    const key = bestKey(m)
+    const t = Math.min(l[key] ?? Infinity, r[key] ?? Infinity)
+    if (t !== Infinity) stats[key] = t
+  }
+  const recent = mergeRecent(l.recent, r.recent)
+  if (recent) stats.recent = recent
   return { items, stats }
 }

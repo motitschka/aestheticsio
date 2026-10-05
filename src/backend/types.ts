@@ -28,6 +28,13 @@ export interface Backend {
   loadProgress(uid: string): Promise<SavedProgress>
   /** Saves progress changes and, when given, the updated leaderboard profile, together. */
   saveProgress(uid: string, patch: ProgressPatch, profile: Profile | null): Promise<void>
+  /**
+   * The journey's fresh start: replaces the whole progress record, keeping the
+   * old one as a backup inside it, and the profile, together.
+   */
+  startFresh(uid: string, next: SavedProgress, backup: SavedProgress, profile: Profile | null): Promise<void>
+  /** Calls back with the stored progress whenever it changes (from any device). Returns an unsubscribe. */
+  watchProgress(uid: string, cb: (saved: SavedProgress) => void): () => void
   listProfiles(): Promise<Profile[]>
 
   getAllowlist(): Promise<string[]>

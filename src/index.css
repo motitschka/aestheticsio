@@ -297,6 +297,7 @@ h2 {
 .segmented {
   display: flex;
   gap: 4px;
+  min-width: 0;
   padding: 4px;
   border-radius: 999px;
   background: var(--surface-2);
@@ -1267,6 +1268,125 @@ button.row {
   margin-bottom: 2px;
 }
 
+/* ---------- the journey through time ---------- */
+
+.era-strip {
+  display: grid;
+  grid-template-columns: repeat(8, 1fr);
+  gap: 4px;
+}
+
+.era-seg {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.era-track {
+  height: 8px;
+  border-radius: 999px;
+  background: var(--surface-2);
+  overflow: hidden;
+}
+
+.era-fill {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--accent);
+  transition: width 0.4s ease;
+}
+
+.era-seg.is-done .era-track {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+.era-label {
+  font-size: 0.68rem;
+  font-weight: 600;
+  text-align: center;
+  white-space: nowrap;
+  color: var(--muted);
+}
+
+.era-group {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 8px;
+  min-width: 0;
+}
+
+.era-heading {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: 8px;
+  font-size: 0.8rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text);
+}
+
+.era-heading .era-done {
+  font-weight: 700;
+  color: var(--accent-text);
+}
+
+.daily-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.daily-count {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 48px;
+  height: 48px;
+  border-radius: 999px;
+  border: 2px solid var(--accent);
+  font-weight: 700;
+  color: var(--accent-text);
+}
+
+.daily-goal.is-met .daily-count {
+  background: var(--accent);
+  color: var(--on-accent);
+  font-size: 1.3rem;
+}
+
+.daily-stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 16px;
+}
+
+.journey-note h2 {
+  margin: 0;
+}
+
+.journey-note .btn {
+  align-self: flex-start;
+}
+
+.era-finished {
+  align-items: center;
+  text-align: center;
+  border: 2px solid var(--accent);
+}
+
+.goal-done {
+  font-weight: 600;
+  color: var(--accent-text);
+}
+
+.credit {
+  margin-top: 4px;
+}
+
 .mode-list {
   display: grid;
   gap: 8px;
@@ -1462,7 +1582,7 @@ button.row {
 }
 
 /* Text that sits straight on the collage gets a soft halo in the background colour. */
-:root[data-theme] :is(.page > p, .page > h1, .page > h2, .eyebrow, .display, .title, .section-title, .prompt, .muted:not(.card *, .list-item *, .mode-row *, .feedback-panel *)) {
+:root[data-theme] :is(.page > p, .page > h1, .page > h2, .eyebrow, .display, .title, .section-title, .era-heading, .era-label, .prompt, .muted:not(.card *, .list-item *, .mode-row *, .feedback-panel *)) {
   text-shadow:
     0 0 1px var(--bg),
     0 0 2px var(--bg),

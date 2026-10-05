@@ -1,11 +1,13 @@
 import { useMemo, useState } from 'react'
+import { ERAS, eraOf, eraProgress, nextOnJourney } from '../lib/eras'
 import { formatTime } from '../lib/format'
-import { lessonPoints, lessonState, MILESTONES, overallPercent, recognised, type Milestone } from '../lib/progress'
+import { lessonState, MILESTONES, recognised, type Milestone } from '../lib/progress'
 import { buildRound, eligible, MODE_INFO, PRACTICE_MODES, type Question } from '../lib/questions'
 import type { Aesthetic, PracticeMode, SavedProgress } from '../types'
 import { Avatar } from './Avatar'
 import { BadgeRow } from './Badges'
 import { Challenge, type ChallengeOutcome } from './Challenge'
+import { DailyGoal, EraStrip, JourneyNote } from './Journey'
 import { Moodboard, PinDeco } from './Moodboard'
 import { PracticeRound } from './PracticeRound'
 import { StateBadge } from './StateBadge'
@@ -24,13 +26,14 @@ interface Props {
   /** undefined for guests, who aren't on the leaderboard */
   loadStreakRank?(): Promise<{ rank: number; total: number } | null>
   onRoundActive(active: boolean): void
+  /** Dismisses the one-time card about the journey through time. */
+  onDismissNote(): void
 }
 
 type View = { k: 'hub' } | { k: 'round'; mode: PracticeMode; questions: Question[]; n: number } | { k: 'challenge'; target?: Milestone; n: number }
 
-export function Play({ all, byId, saved, now, nickname, onPractice, onChallengeEnd, onLesson, loadStreakRank, onRoundActive }: Props) {
+export function Play({ all, byId, saved, now, nickname, onPractice, onChallengeEnd, onLesson, loadStreakRank, onRoundActive, onDismissNote }: Props) {
   const [view, setView] = useState<View>({ k: 'hub' })
-  const [seed] = useState(Math.random)
 
   const scores = useMemo(() => {
     const out = {} as Record<PracticeMode, { done: number; of: number; label: string }>
@@ -47,16 +50,12 @@ export function Play({ all, byId, saved, now, nickname, onPractice, onChallengeE
     return out
   }, [all, byId, saved])
 
-  // Suggest a lesson: ready to master first, then seen, then a new one.
-  const nextLesson = useMemo(() => {
-    const by = (state: string) => all.filter((a) => lessonState(saved.items[a.id], now) === state)
-    const ready = by('ready')
-    if (ready.length) return ready[0]
-    const seen = by('seen')
-    if (seen.length) return seen[0]
-    const fresh = by('new')
-    return fresh[Math.floor(seed * fresh.length)] ?? null
-  }, [all, saved, now, seed])
+  // The next lesson walks the journey from the oldest era; once all are learned, ones ready to master.
+  const nextLesson = useMemo(
+    () => nextOnJourney(all, saved.items) ?? all.find((a) => lessonState(saved.items[a.id], now) === 'ready') ?? null,
+    [all, saved, now],
+  )
+  const eras = useMemo(() => eraProgress(all, saved.items), [all, saved])
 
   const start = (mode: PracticeMode) => {
     const questions = buildRound(mode, all, byId, saved.items)
@@ -103,38 +102,35 @@ export function Play({ all, byId, saved, now, nickname, onPractice, onChallengeE
     )
   }
 
-  const points = lessonPoints(saved.items)
-  const pct = overallPercent(points, all.length)
-  const counts = { learned: 0, mastered: 0, seen: 0 }
-  for (const a of all) {
-    const s = lessonState(saved.items[a.id], now)
-    if (s === 'learned' || s === 'ready') counts.learned++
-    else if (s === 'mastered') counts.mastered++
-    else if (s === 'seen') counts.seen++
-  }
+  const learned = eras.reduce((n, e) => n + e.learned, 0)
+  const mastered = all.filter((a) => lessonState(saved.items[a.id], now) === 'mastered').length
   const { stats } = saved
+  const nextEra = nextLesson ? eraOf(nextLesson) : null
 
   return (
     <section className="page start">
       <Moodboard from={1} />
       <p className="eyebrow">{nickname ? `Hi ${nickname}` : 'Welcome'}</p>
       <h1 className="display">
-        {pct}
-        <span className="display-of">%</span>
+        {learned}
+        <span className="display-of">/{all.length}</span>
       </h1>
-      <div className="bar bar-200" aria-hidden>
-        <div className="bar-fill" style={{ width: `${Math.min(pct, 200) / 2}%` }} />
-      </div>
+      <EraStrip learned={eras.map((e) => e.learned)} totals={eras.map((e) => e.total)} labels />
       <p className="muted small">
-        {counts.learned} learned · {counts.mastered} mastered · {counts.seen} seen. Learning every lesson is 100%, mastering every one is
-        200%.
+        {learned === all.length
+          ? `Every aesthetic learned: the journey is done.${mastered < all.length ? ' Mastering them is the next lap.' : ''}`
+          : `${learned} learned${mastered ? ` · ${mastered} mastered` : ''}. Learn all ${all.length}, from before 1900 to now, to finish the journey.`}
       </p>
+
+      {stats.journeyNote === 1 && <JourneyNote onDismiss={onDismissNote} />}
+
+      <DailyGoal stats={stats} now={now} />
 
       {nextLesson && (
         <button className="card next-lesson" onClick={() => onLesson(nextLesson)}>
           <Avatar aesthetic={nextLesson} nickname={nextLesson.name} size={56} />
           <span className="row-main">
-            <span className="muted small">Next lesson</span>
+            <span className="muted small">{nextEra !== null && learned < all.length ? `Next on the journey · ${ERAS[nextEra].label}` : 'Ready to master'}</span>
             <span className="row-name">{nextLesson.name}</span>
           </span>
           <StateBadge state={lessonState(saved.items[nextLesson.id], now)} />

@@ -4,6 +4,8 @@ export interface Aesthetic {
   wiki: string
   /** Full-size Fandom image URLs; the first one is the page's main image. */
   images: string[]
+  /** The published Pinterest pins (public/pins/<id>/), added when the themes load. Lessons check with these. */
+  pins?: string[]
   // Facts from the wiki page; any of these can be missing.
   intro?: string
   aliases?: string[]
@@ -65,7 +67,25 @@ export interface PlayerStats {
   best100?: number
   /** id of the chosen theme; '' for the default look */
   theme?: string
+  /** Journey version. 2 = the journey through time; older progress was reset (a backup is kept). */
+  v?: number
+  /** 1 after the reset to the journey, until its welcome card is dismissed (then 0) */
+  journeyNote?: 0 | 1
+  // Daily goal: a lesson a day keeps the day streak going.
+  /** The last day (YYYY-MM-DD, local time) the goal was met */
+  goalDay?: string
+  dayStreak?: number
+  bestDayStreak?: number
+  /** Streak freezes banked by doing twice the goal in a day (at most 2); each covers one missed day */
+  freezes?: number
+  /** Lessons finished on day d */
+  today?: { d: string; n: number }
+  /** The latest moments for the circle feed, newest first */
+  recent?: CircleEvent[]
 }
+
+/** A moment friends see in the circle feed: a lesson learned, or an era finished. */
+export type CircleEvent = { k: 'learned'; id: string; t: number } | { k: 'era'; e: number; t: number }
 
 export interface SavedProgress {
   items: Progress
@@ -87,6 +107,13 @@ export interface Profile {
   /** practice answers, for accuracy */
   correct: number
   answered: number
+  /** Learned lessons per era, oldest first (see lib/eras) */
+  eras?: number[]
+  /** Day streak, as of goalDay */
+  dayStreak?: number
+  goalDay?: string
+  freezes?: number
+  recent?: CircleEvent[]
 }
 
 export interface AppUser {

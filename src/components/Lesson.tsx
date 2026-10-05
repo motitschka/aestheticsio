@@ -1,4 +1,5 @@
-import { useCallback, useMemo, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
+import { ERAS, eraOf, type Era } from '../lib/eras'
 import { SIZE } from '../lib/images'
 import { LESSON_LABEL, MASTERY_WAIT, type LessonState } from '../lib/progress'
 import { lessonSteps, rebuildLessonQuestion, type InfoCard, type LessonFormat, type LessonStep, type Question } from '../lib/questions'
@@ -10,14 +11,26 @@ import { QuestionView } from './QuestionView'
 import { StateBadge } from './StateBadge'
 import { ThemePreview } from './ThemePicker'
 
+/** What a finished lesson changed, for its Done screen. */
+export interface LessonOutcome {
+  before: LessonState
+  after: LessonState
+  unlocked: boolean
+  /** The day's goal was met with this lesson */
+  goalMet: boolean
+  freezeEarned: boolean
+  dayStreak: number
+  erasFinished: Era[]
+}
+
 interface Props {
   aesthetic: Aesthetic
   all: Aesthetic[]
   byId: Map<string, Aesthetic>
   entry: Entry | undefined
   state: LessonState
-  /** Records a finished lesson run; returns the lesson state before and after, and whether its theme just unlocked. */
-  onFinish(perfect: boolean): { before: LessonState; after: LessonState; unlocked: boolean }
+  /** Records a finished lesson run and returns what it changed. */
+  onFinish(perfect: boolean): LessonOutcome
   /** This aesthetic's theme, offered once it unlocks. */
   theme?: Theme
   themeInUse: boolean
@@ -28,11 +41,13 @@ interface Props {
 type Phase =
   | { k: 'choose' }
   | { k: 'steps'; format: LessonFormat }
-  | { k: 'done'; format: LessonFormat; perfect: boolean; before: LessonState; after: LessonState; unlocked: boolean }
+  | ({ k: 'done'; format: LessonFormat; perfect: boolean } & LessonOutcome)
 
 export function Lesson({ aesthetic: a, all, byId, entry, state, onFinish, theme, themeInUse, onUseTheme, onClose }: Props) {
   // The first time is always the full lesson; after that, info and questions are separate.
   const [phase, setPhase] = useState<Phase>(state === 'new' ? { k: 'steps', format: 'full' } : { k: 'choose' })
+  // While a question is on screen the header doesn't name the aesthetic: the questions do the asking.
+  const [asking, setAsking] = useState(false)
 
   return (
     <div className="lesson-screen">
@@ -40,7 +55,7 @@ export function Lesson({ aesthetic: a, all, byId, entry, state, onFinish, theme,
         <button className="icon-btn" onClick={onClose} aria-label="Close lesson">
           ✕
         </button>
-        <span className="lesson-title">{a.name}</span>
+        <span className="lesson-title">{asking && phase.k === 'steps' ? `Check · ${ERAS[eraOf(a)].label}` : a.name}</span>
       </div>
 
       {phase.k === 'choose' && <Choose a={a} entry={entry} state={state} onPick={(format) => setPhase({ k: 'steps', format })} />}
@@ -51,8 +66,12 @@ export function Lesson({ aesthetic: a, all, byId, entry, state, onFinish, theme,
           all={all}
           byId={byId}
           format={phase.format}
+          onAsking={setAsking}
           onDone={(perfect) => {
-            const change = phase.format === 'info' ? { before: state, after: state, unlocked: false } : onFinish(perfect)
+            const change: LessonOutcome =
+              phase.format === 'info'
+                ? { before: state, after: state, unlocked: false, goalMet: false, freezeEarned: false, dayStreak: 0, erasFinished: [] }
+                : onFinish(perfect)
             setPhase({ k: 'done', format: phase.format, perfect, ...change })
           }}
         />
@@ -93,14 +112,24 @@ interface QueueItem {
   retry: boolean
 }
 
-function Steps({ a, all, byId, format, onDone }: { a: Aesthetic; all: Aesthetic[]; byId: Map<string, Aesthetic>; format: LessonFormat; onDone(perfect: boolean): void }) {
-  const initial = useMemo(() => lessonSteps(a, all, format), [a, all, format])
+function Steps({ a, all, byId, format, onDone, onAsking }: {
+  a: Aesthetic
+  all: Aesthetic[]
+  byId: Map<string, Aesthetic>
+  format: LessonFormat
+  onDone(perfect: boolean): void
+  onAsking(asking: boolean): void
+}) {
+  // Built once per lesson run, so a late-loading list (pins arrive with the themes) can't reshuffle it.
+  const [initial] = useState(() => lessonSteps(a, all, format))
   const [queue, setQueue] = useState<QueueItem[]>(() => initial.map((step) => ({ step, retry: false })))
   const [index, setIndex] = useState(0)
   const [mistakes, setMistakes] = useState(0)
 
   const current = queue[index]
   const total = queue.length
+  const isQuestion = current?.step.type === 'question'
+  useEffect(() => onAsking(isQuestion), [isQuestion, onAsking])
 
   const next = useCallback(() => {
     if (index + 1 >= queue.length) onDone(mistakes === 0)
@@ -170,6 +199,17 @@ export function InfoView({ card, a, byId }: { card: InfoCard; a: Aesthetic; byId
               {p}
             </p>
           ))}
+          <p className="muted small credit">
+            From the{' '}
+            <a className="link" href={a.wiki} target="_blank" rel="noreferrer">
+              Aesthetics Wiki
+            </a>{' '}
+            (
+            <a className="link" href="https://creativecommons.org/licenses/by-sa/3.0/" target="_blank" rel="noreferrer">
+              CC BY-SA
+            </a>
+            ), shortened.
+          </p>
         </div>
       )
     case 'gallery':
@@ -268,19 +308,16 @@ export function InfoView({ card, a, byId }: { card: InfoCard; a: Aesthetic; byId
   }
 }
 
-export function Done({ a, format, perfect, before, after, unlocked, theme, themeInUse, onUseTheme, onAgain, onClose }: {
+export function Done({ a, format, perfect, before, after, unlocked, goalMet, freezeEarned, dayStreak, erasFinished, theme, themeInUse, onUseTheme, onAgain, onClose }: {
   a: Aesthetic
   format: LessonFormat
   perfect: boolean
-  before: LessonState
-  after: LessonState
-  unlocked: boolean
   theme?: Theme
   themeInUse: boolean
   onUseTheme(id: string): void
   onAgain(): void
   onClose(): void
-}) {
+} & LessonOutcome) {
   const changed = before !== after
   let headline = 'Lesson complete'
   let text = ''
@@ -293,9 +330,8 @@ export function Done({ a, format, perfect, before, after, unlocked, theme, theme
   } else if (after === 'learned' && changed) {
     headline = 'Learned!'
     text = `Every question right. Come back in a month and do it perfectly again to master it.`
-  } else if (before === 'learned' && after === 'seen') {
-    headline = 'Back to seen'
-    text = `A mistake dropped ${a.name} back to seen. Get everything right in one go to learn it again.`
+  } else if (!perfect && (before === 'learned' || before === 'ready')) {
+    text = `${a.name} stays learned. A mistake starts its month again before it can be mastered.`
   } else if (perfect) {
     text = after === 'mastered' ? `${a.name} stays mastered.` : `Every question right. ${a.name} stays ${LESSON_LABEL[after].toLowerCase()}.`
   } else {
@@ -309,6 +345,19 @@ export function Done({ a, format, perfect, before, after, unlocked, theme, theme
       <h1 className="title center">{headline}</h1>
       <StateBadge state={after} />
       <p className="muted center">{text}</p>
+      {erasFinished.map((e) => (
+        <div key={e} className="card era-finished">
+          <strong>{ERAS[e].label}: done</strong>
+          <span className="muted small">Every aesthetic of the era learned. Your friends will see it.</span>
+        </div>
+      ))}
+      {(goalMet || freezeEarned) && (
+        <p className="goal-done small center">
+          {goalMet && `Today’s lesson done · ${dayStreak}-day streak`}
+          {goalMet && freezeEarned && ' · '}
+          {freezeEarned && 'A freeze banked for a day you miss'}
+        </p>
+      )}
       {unlocked && theme && (
         <div className="card theme-unlocked">
           <span style={{ width: 96, flex: 'none' }}>

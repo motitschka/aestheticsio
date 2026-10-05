@@ -1,21 +1,31 @@
 import type { SavedProgress } from '../types'
-import { emptyStats, normalizeSaved } from './progress'
+import { emptyStats, freshStart, hasProgress, needsFreshStart, normalizeSaved } from './progress'
 import { storageKey } from './storage'
 
 // Guest play keeps progress in this browser only. When a guest signs in,
 // their progress is merged into the account and cleared here.
 const PROGRESS_KEY = storageKey('guest-progress')
 const GUEST_KEY = storageKey('guest')
+/** A guest's progress from before the journey through time, kept when it was reset. */
+const BACKUP_KEY = storageKey('guest-progress-v1-backup')
 
+/** This browser's progress. The first load after the journey arrived starts it fresh, keeping a backup. */
 export function loadGuestProgress(): SavedProgress {
   try {
-    return normalizeSaved(JSON.parse(localStorage.getItem(PROGRESS_KEY) ?? '{}'))
+    const raw = localStorage.getItem(PROGRESS_KEY)
+    const saved = normalizeSaved(JSON.parse(raw ?? '{}'))
+    if (!needsFreshStart(saved)) return saved
+    const had = hasProgress(saved)
+    if (had && raw && !localStorage.getItem(BACKUP_KEY)) localStorage.setItem(BACKUP_KEY, JSON.stringify({ ...JSON.parse(raw), at: Date.now() }))
+    const next = freshStart(had)
+    if (had) localStorage.setItem(PROGRESS_KEY, JSON.stringify(next))
+    return next
   } catch {
     return { items: {}, stats: emptyStats() }
   }
 }
 
-export const hasGuestProgress = (p: SavedProgress) => Object.keys(p.items).length > 0 || p.stats.timelineTotal > 0 || p.stats.bestStreak > 0
+export const hasGuestProgress = hasProgress
 
 export function saveGuestProgress(progress: SavedProgress) {
   try {

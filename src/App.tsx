@@ -5,7 +5,7 @@ import { Backdrop } from './components/Backdrop'
 import type { ChallengeOutcome } from './components/Challenge'
 import { Message, NoAccess, SignIn, Splash } from './components/Gates'
 import { Leaderboard, LeaderboardSignIn } from './components/Leaderboard'
-import { Lesson } from './components/Lesson'
+import { Lesson, type LessonOutcome } from './components/Lesson'
 import { Me } from './components/Me'
 import { Play } from './components/Play'
 import { ProfileEditor } from './components/ProfileEditor'
@@ -14,30 +14,38 @@ import { ThemePicker } from './components/ThemePicker'
 import { loadAestheticsData, loadThemes } from './data'
 import { formatTime } from './lib/format'
 import { clearGuestProgress, hasGuestProgress, loadGuestChoice, loadGuestProgress, saveGuestChoice, saveGuestProgress } from './lib/guest'
+import { erasFinished, isLearned } from './lib/eras'
 import {
   applyChallenge,
+  applyDailyLesson,
   applyLesson,
   applyPractice,
   earnedBadges,
   emptyStats,
+  freshStart,
+  hasProgress,
   lessonState,
   mergeSaved,
   MILESTONES,
+  needsFreshStart,
   profileFrom,
   rankByStreak,
   recognised,
+  syncMerge,
+  withRecent,
   type Milestone,
 } from './lib/progress'
 import type { Question } from './lib/questions'
 import { START_AS_GUEST_EVENT } from './lib/intro-events'
-import { applyTheme, themeUnlocked, type Themes } from './lib/theme'
+import { applyTheme, pinUrl, themeUnlocked, type Themes } from './lib/theme'
 import { ThemeContext } from './lib/theme-context'
 import { Icon, type IconName } from './components/Icon'
-import type { AestheticsData, AppUser, PracticeMode, SavedProgress } from './types'
+import type { Aesthetic, AestheticsData, AppUser, CircleEvent, PracticeMode, SavedProgress } from './types'
 
 type Tab = 'play' | 'progress' | 'ranks' | 'me'
 type Status = 'loading' | 'noAccess' | 'error' | 'ready'
 type Identity = { nickname: string; avatar: string }
+
 
 const emptySaved = (): SavedProgress => ({ items: {}, stats: emptyStats() })
 
@@ -57,6 +65,8 @@ export default function App() {
   const [identity, setIdentity] = useState<Identity | null>(null)
   const [saved, setSaved] = useState<SavedProgress>(() => (guest ? loadGuestProgress() : emptySaved()))
   const savedRef = useRef(saved)
+  /** The aesthetics as last loaded, for callbacks that outlive a render. */
+  const allRef = useRef<Aesthetic[]>([])
   const [now, setNow] = useState(Date.now)
 
   const [tab, setTab] = useState<Tab>('play')
@@ -83,15 +93,22 @@ export default function App() {
       try {
         const [isAdmin, remote] = await Promise.all([backend.isAdmin(), backend.loadProgress(user.uid)])
         let progress = remote
+        const p = await backend.loadProfile(user.uid)
+        // The journey through time starts everyone fresh, once; the old record is kept as a backup.
+        if (needsFreshStart(remote)) {
+          const had = hasProgress(remote)
+          progress = freshStart(had)
+          if (had) await backend.startFresh(user.uid, progress, remote, p ? profileFrom(p, progress, allRef.current) : null)
+          else await backend.saveProgress(user.uid, { stats: progress.stats }, null)
+        }
         const guestProgress = loadGuestProgress()
         const carried = hasGuestProgress(guestProgress)
         if (carried) {
-          progress = mergeSaved(remote, guestProgress)
+          progress = mergeSaved(progress, guestProgress)
           await backend.saveProgress(user.uid, progress, null)
           clearGuestProgress()
         }
-        const p = await backend.loadProfile(user.uid)
-        if (p && carried) await backend.saveProfile(profileFrom(p, progress))
+        if (p && carried) await backend.saveProfile(profileFrom(p, progress, allRef.current))
         if (cancelled) return
         saveGuestChoice(false)
         setGuest(false)
@@ -110,12 +127,33 @@ export default function App() {
     }
   }, [backend, user])
 
-  const aesthetics = useMemo(() => data?.items ?? [], [data])
+  // Each aesthetic with its published pins: lessons check with images the lesson hasn't shown.
+  const aesthetics = useMemo(
+    () =>
+      (data?.items ?? []).map((a) => {
+        const t = themes?.[a.id]
+        return t?.pins ? { ...a, pins: Array.from({ length: t.pins }, (_, i) => pinUrl(t, i + 1)) } : a
+      }),
+    [data, themes],
+  )
   const byId = useMemo(() => new Map(aesthetics.map((a) => [a.id, a])), [aesthetics])
+  useEffect(() => {
+    allRef.current = aesthetics
+  }, [aesthetics])
   const [avatarSeed] = useState(Math.random)
   const randomAvatar = aesthetics[Math.floor(avatarSeed * aesthetics.length)]?.id ?? ''
   const status: Status = session && account && session.uid === account.uid ? session.status : 'loading'
-  const profile = useMemo(() => (account && identity ? profileFrom({ uid: account.uid, ...identity }, saved) : null), [account, identity, saved])
+  const profile = useMemo(() => (account && identity ? profileFrom({ uid: account.uid, ...identity }, saved, aesthetics) : null), [account, identity, saved, aesthetics])
+
+  // Another device (or a tab left open) may change the account: keep this one up to date.
+  useEffect(() => {
+    if (!backend || !account || status !== 'ready') return
+    return backend.watchProgress(account.uid, (remote) => {
+      const merged = syncMerge(savedRef.current, remote)
+      savedRef.current = merged
+      setSaved(merged)
+    })
+  }, [backend, account, status])
 
   // The chosen theme, if it's unlocked, dresses the whole app.
   const themeId = saved.stats.theme ?? ''
@@ -130,7 +168,7 @@ export default function App() {
       setNow(Date.now())
       if (backend && account) {
         if (!identity) return
-        backend.saveProgress(account.uid, patch, profileFrom({ uid: account.uid, ...identity }, next)).then(
+        backend.saveProgress(account.uid, patch, profileFrom({ uid: account.uid, ...identity }, next, allRef.current)).then(
           () => setSaveFailed(false),
           () => setSaveFailed(true),
         )
@@ -159,16 +197,36 @@ export default function App() {
   )
 
   const recordLesson = useCallback(
-    (id: string, perfect: boolean) => {
+    (id: string, perfect: boolean): LessonOutcome => {
       const s = savedRef.current
       const t = Date.now()
       const prev = s.items[id]
       const entry = applyLesson(prev, perfect, t)
-      commit({ ...s, items: { ...s.items, [id]: entry } }, { items: { [id]: entry } })
-      return { before: lessonState(prev, t), after: lessonState(entry, t), unlocked: themeUnlocked(entry) && !themeUnlocked(prev) }
+      const items = { ...s.items, [id]: entry }
+      const daily = applyDailyLesson(s.stats, t)
+      // Moments for the circle feed: a lesson learned, an era finished.
+      const eras = erasFinished(allRef.current, s.items, items)
+      const events: CircleEvent[] = [...eras.map((e): CircleEvent => ({ k: 'era', e, t })), ...(isLearned(items, id) && !isLearned(s.items, id) ? [{ k: 'learned' as const, id, t }] : [])]
+      const stats = withRecent(daily.stats, events)
+      commit({ items, stats }, { items: { [id]: entry }, stats })
+      return {
+        before: lessonState(prev, t),
+        after: lessonState(entry, t),
+        unlocked: themeUnlocked(entry) && !themeUnlocked(prev),
+        goalMet: daily.goalMet,
+        freezeEarned: daily.freezeEarned,
+        dayStreak: stats.dayStreak ?? 0,
+        erasFinished: eras,
+      }
     },
     [commit],
   )
+
+  const dismissJourneyNote = useCallback(() => {
+    const s = savedRef.current
+    const stats = { ...s.stats, journeyNote: 0 as const }
+    commit({ ...s, stats }, { stats })
+  }, [commit])
 
   const recordChallenge = useCallback(
     (streak: number, splits: Partial<Record<Milestone, number>>): ChallengeOutcome => {
@@ -271,7 +329,7 @@ export default function App() {
   }, [playing])
 
   const saveProfile = async (nickname: string, avatar: string) => {
-    const next = profileFrom({ uid: account!.uid, nickname, avatar }, savedRef.current)
+    const next = profileFrom({ uid: account!.uid, nickname, avatar }, savedRef.current, allRef.current)
     await backend!.saveProfile(next)
     setIdentity({ nickname, avatar })
     setEditing(false)
@@ -371,6 +429,7 @@ export default function App() {
             onLesson={openLesson}
             loadStreakRank={profile ? loadStreakRank : undefined}
             onRoundActive={setInRound}
+            onDismissNote={dismissJourneyNote}
           />
         </div>
         {tab === 'progress' && <ProgressView aesthetics={aesthetics} items={saved.items} now={now} onLesson={openLesson} />}
