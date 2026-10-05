@@ -3,7 +3,7 @@
 import { mkdir, readdir } from 'node:fs/promises'
 import { fileURLToPath } from 'node:url'
 import sharp from 'sharp'
-import { pinFiles } from './pins.mjs'
+import { boardFiles } from './pins.mjs'
 
 const data = JSON.parse(await (await import('node:fs/promises')).readFile(new URL('../data/aesthetics.json', import.meta.url), 'utf8'))
 const OUT = new URL('../.impeccable/pins/', import.meta.url)
@@ -20,7 +20,7 @@ const PER_SHEET = 6
 const escape = (s) => s.replace(/[&<>]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' })[c])
 
 async function block(a, index) {
-  const files = (await pinFiles(a.name)).slice(0, 10)
+  const files = (await boardFiles(a)).slice(0, 10)
   const layers = [
     {
       input: Buffer.from(

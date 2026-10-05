@@ -5,7 +5,7 @@
 import { readFile, writeFile } from 'node:fs/promises'
 import sharp from 'sharp'
 import { kmeans, rgbToOklab, themeColours } from './colour.mjs'
-import { pinFiles } from './pins.mjs'
+import { boardFiles } from './pins.mjs'
 import { DESIGNS } from './theme-designs.mjs'
 
 const SIZE = 64
@@ -55,7 +55,7 @@ const failures = []
 const out = {}
 for (const [i, a] of data.items.entries()) {
   const design = DESIGNS[a.id]
-  const files = await pinFiles(a.name)
+  const files = await boardFiles(a)
   if (!design || !files.length) {
     problems.push(`${a.name}: ${design ? 'no pins' : 'no design'}`)
     continue
