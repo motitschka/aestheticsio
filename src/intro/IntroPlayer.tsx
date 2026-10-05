@@ -6,6 +6,7 @@ import themesCss from '../themes.css?inline'
 import { loadAestheticsData, loadThemes } from '../data'
 import { START_AS_GUEST_EVENT } from '../lib/intro-events'
 import { emptyStats } from '../lib/progress'
+import { storageKey } from '../lib/storage'
 import { buildPractice, type ChoiceQuestion, type InfoCard } from '../lib/questions'
 import { applyTheme, type Theme, type Themes } from '../lib/theme'
 import type { Aesthetic, SavedProgress } from '../types'
@@ -172,7 +173,7 @@ export function IntroPlayer({ mode, onDone }: { mode: IntroMode; onDone(): void 
   const finish = (startLearning: boolean) => {
     if (leaving) return
     try {
-      localStorage.setItem('aesthetics:intro-seen', '1')
+      localStorage.setItem(storageKey('intro-seen'), '1')
     } catch {
       // private mode: it just shows again next time
     }

@@ -1,10 +1,11 @@
 import type { SavedProgress } from '../types'
 import { emptyStats, normalizeSaved } from './progress'
+import { storageKey } from './storage'
 
 // Guest play keeps progress in this browser only. When a guest signs in,
 // their progress is merged into the account and cleared here.
-const PROGRESS_KEY = 'aesthetics:guest-progress'
-const GUEST_KEY = 'aesthetics:guest'
+const PROGRESS_KEY = storageKey('guest-progress')
+const GUEST_KEY = storageKey('guest')
 
 export function loadGuestProgress(): SavedProgress {
   try {

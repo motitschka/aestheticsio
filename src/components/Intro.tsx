@@ -1,9 +1,10 @@
 import { lazy, Suspense, useEffect, useState } from 'react'
 import { SHOW_INTRO_EVENT } from '../lib/intro-events'
+import { storageKey } from '../lib/storage'
 
 const IntroPlayer = lazy(() => import('../intro/IntroPlayer').then((m) => ({ default: m.IntroPlayer })))
 
-const SEEN_KEY = 'aesthetics:intro-seen'
+const SEEN_KEY = storageKey('intro-seen')
 /** Dev only: ?intro-video=portrait|landscape renders the shareable cut (scripts drive it frame by frame). */
 const videoCut = import.meta.env.DEV ? new URLSearchParams(location.search).get('intro-video') : null
 
@@ -11,7 +12,7 @@ const videoCut = import.meta.env.DEV ? new URLSearchParams(location.search).get(
 function firstVisit(): boolean {
   try {
     if (localStorage.getItem(SEEN_KEY) === '1') return false
-    if (localStorage.getItem('aesthetics:guest') || localStorage.getItem('aesthetics:guest-progress')) return false
+    if (localStorage.getItem(storageKey('guest')) || localStorage.getItem(storageKey('guest-progress'))) return false
     if (matchMedia('(prefers-reduced-motion: reduce)').matches) return false
     if ((navigator as Navigator & { connection?: { saveData?: boolean } }).connection?.saveData) return false
     return true

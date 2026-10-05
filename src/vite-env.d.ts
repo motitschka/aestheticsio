@@ -7,4 +7,6 @@ interface ImportMetaEnv {
   readonly VITE_FIREBASE_PROJECT_ID?: string
   readonly VITE_FIREBASE_APP_ID?: string
   readonly VITE_USE_EMULATORS?: string
+  /** Keeps the /next/ preview's browser storage apart from the live site's. */
+  readonly VITE_STORAGE_PREFIX?: string
 }

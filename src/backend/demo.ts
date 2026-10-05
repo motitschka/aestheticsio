@@ -1,6 +1,7 @@
 // Local stand-in for Firebase so the app can be tried without a Firebase
 // project: `npm run dev:demo`. Everything is stored in this browser only.
 import { normalizeSaved } from '../lib/progress'
+import { storageKey } from '../lib/storage'
 import type { AppUser, Profile, SavedProgress } from '../types'
 import type { Backend } from './types'
 
@@ -13,7 +14,7 @@ const FRIENDS: Profile[] = [
 
 function read<T>(key: string, fallback: T): T {
   try {
-    const raw = localStorage.getItem(`demo:${key}`)
+    const raw = localStorage.getItem(storageKey(`demo:${key}`))
     return raw ? (JSON.parse(raw) as T) : fallback
   } catch {
     return fallback
@@ -22,7 +23,7 @@ function read<T>(key: string, fallback: T): T {
 
 function write(key: string, value: unknown) {
   try {
-    localStorage.setItem(`demo:${key}`, JSON.stringify(value))
+    localStorage.setItem(storageKey(`demo:${key}`), JSON.stringify(value))
   } catch {
     // storage unavailable: the demo just won't remember anything
   }
