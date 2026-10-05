@@ -3,7 +3,7 @@
 <radialGradient id="orb" cx="0.42" cy="0.34" r="0.74"><stop offset="0" stop-color="#c4f5ff"/><stop offset="0.48" stop-color="#3cc0dc"/><stop offset="0.86" stop-color="#1676a8"/><stop offset="1" stop-color="#0d3f6e"/></radialGradient>
 <radialGradient id="bounce" cx="0.5" cy="0.6" r="0.5"><stop offset="0" stop-color="#b8f4ff" stop-opacity="0.6"/><stop offset="1" stop-color="#b8f4ff" stop-opacity="0"/></radialGradient>
 </defs>
-<rect width="1024" height="1024" rx="224" fill="#5b3fd9"/>
+<rect width="1024" height="1024" fill="#5b3fd9"/>
 <path d="M122 486V304A182 182 0 0 1 486 304V486Z" fill="#1c1a18"/>
 <path d="M468.93 399.21A166 166 0 0 0 448.48 336.26L394.52 366.79A104 104 0 0 1 407.33 406.23ZM426.39 305.85A166 166 0 0 0 372.84 266.95L347.13 323.36A104 104 0 0 1 380.68 347.74ZM337.1 255.33A166 166 0 0 0 270.9 255.33L283.27 316.09A104 104 0 0 1 324.73 316.09ZM235.16 266.95A166 166 0 0 0 181.61 305.85L227.32 347.74A104 104 0 0 1 260.87 323.36ZM159.52 336.26A166 166 0 0 0 139.07 399.21L200.67 406.23A104 104 0 0 1 213.48 366.79Z" fill="#e8b04a"/>
 <path d="M224 418A80 80 0 0 1 384 418Z" fill="#e8b04a"/>

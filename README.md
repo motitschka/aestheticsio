@@ -47,6 +47,9 @@ on the Aesthetics Wiki.
   there. It isn't shown with reduced motion or Save-Data, and can be replayed under
   **Me → Watch the intro**. A shareable video cut of it (no wiki photos) is rendered
   from the same code in dev with `?intro-video=portrait` or `landscape`.
+- **On the home screen:** Share → Add to Home Screen gives an app icon (a moodboard of
+  four eras: an Art Deco sunburst, a Memphis ribbon, a pixel heart and a Frutiger Aero
+  orb), the label "Aesthetics", and full-screen play.
 - **Play without signing in:** guest progress is saved in the browser.
 - **Or sign in with Google (invite only):** progress syncs across devices (live,
   and records never go backwards) and you join the circle: a feed of what friends
@@ -128,6 +131,7 @@ then the app keeps working with the old rules and just leaves out the new fields
 | `npm run fetch-data` | Re-download the aesthetics into `data/aesthetics.json`; commit and push to publish |
 | `npm run make-pins` | Resize the Pinterest boards in `pinterest/<Aesthetic name>/` (local, not committed) into `public/pins/<id>/` |
 | `npm run make-themes` | Rebuild `data/themes.json`: colours from each board's pins, plus the hand-picked fonts, shapes, layout, icons, motion and pattern in `scripts/theme-designs.mjs` |
+| `npm run make-icon` | Redraw the app icon (`scripts/make-icon.cjs`) into `public/icons/`, `public/apple-touch-icon.png` and `public/favicon.svg` |
 | `npm run deploy:rules` | Deploy `firestore.rules` to Firebase |
 
 ## How access works
