@@ -47,9 +47,8 @@ on the Aesthetics Wiki.
   there. It isn't shown with reduced motion or Save-Data, and can be replayed under
   **Me → Watch the intro**. A shareable video cut of it (no wiki photos) is rendered
   from the same code in dev with `?intro-video=portrait` or `landscape`.
-- **On the home screen:** Share → Add to Home Screen gives an app icon (a moodboard of
-  four eras: an Art Deco sunburst, a Memphis ribbon, a pixel heart and a Frutiger Aero
-  orb), the label "Aesthetics", and full-screen play.
+- **On the home screen:** Share → Add to Home Screen gives an app icon (a pixel heart
+  on the brand violet), the label "Aesthetics", and full-screen play.
 - **Play without signing in:** guest progress is saved in the browser.
 - **Or sign in with Google (invite only):** progress syncs across devices (live,
   and records never go backwards) and you join the circle: a feed of what friends
