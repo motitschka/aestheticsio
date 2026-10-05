@@ -92,6 +92,43 @@ describe('allowlisted friends', () => {
     await assertFails(setDoc(doc(db, 'profiles/friend'), { ...profile, lessonPoints: 1.5 }))
     await assertFails(setDoc(doc(db, 'profiles/friend'), { ...profile, best25: 0 }))
     await assertFails(setDoc(doc(db, 'profiles/friend'), { ...profile, learned: 3 }))
+    await assertFails(setDoc(doc(db, 'profiles/friend'), { ...profile, lessonPoints: 1000 }))
+    await assertFails(setDoc(doc(db, 'profiles/friend'), { ...profile, best25: 5000 }))
+    await assertFails(setDoc(doc(db, 'profiles/friend'), { ...profile, bestStreak: 100000 }))
+  })
+
+  const journey = {
+    eras: [17, 12, 2, 0, 0, 0, 0, 0],
+    dayStreak: 12,
+    goalDay: '2026-10-05',
+    freezes: 1,
+    recent: [
+      { k: 'learned', id: 'atomic-age', t: 1 },
+      { k: 'era', e: 1, t: 2 },
+    ],
+  }
+
+  it('profiles can carry the journey: era progress, day streak and recent moments', async () => {
+    await assertSucceeds(setDoc(doc(friend(), 'profiles/friend'), { ...profile, ...journey }))
+  })
+
+  it('journey fields are checked', async () => {
+    const db = friend()
+    await assertFails(setDoc(doc(db, 'profiles/friend'), { ...profile, ...journey, eras: [1, 2, 3] }))
+    await assertFails(setDoc(doc(db, 'profiles/friend'), { ...profile, ...journey, eras: [1, 2, 3, 4, 5, 6, 7, 'x'] }))
+    await assertFails(setDoc(doc(db, 'profiles/friend'), { ...profile, ...journey, eras: [99, 0, 0, 0, 0, 0, 0, 0] }))
+    await assertFails(setDoc(doc(db, 'profiles/friend'), { ...profile, ...journey, freezes: 3 }))
+    await assertFails(setDoc(doc(db, 'profiles/friend'), { ...profile, ...journey, dayStreak: -1 }))
+    await assertFails(setDoc(doc(db, 'profiles/friend'), { ...profile, ...journey, goalDay: 'yesterday' }))
+    await assertFails(setDoc(doc(db, 'profiles/friend'), { ...profile, ...journey, recent: Array(7).fill({ k: 'era', e: 0, t: 1 }) }))
+  })
+
+  it('the fresh start replaces progress and keeps a backup inside it', async () => {
+    const db = friend()
+    await assertSucceeds(setDoc(doc(db, 'progress/friend'), { items: { 'art-deco': { lt: 2, c: 0, w: 0, t: 1 } }, stats: { bestStreak: 3 } }))
+    await assertSucceeds(
+      setDoc(doc(db, 'progress/friend'), { items: {}, stats: { v: 2, journeyNote: 1 }, backupV1: { items: { 'art-deco': { lt: 2 } }, at: 1 } }),
+    )
   })
 
   it("can't read or change the allowlist", async () => {

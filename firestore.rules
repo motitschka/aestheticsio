@@ -35,20 +35,44 @@ service cloud.firestore {
       return isAllowed() && request.auth.uid == uid;
     }
 
-    function optionalTime(d, key) {
-      return !(key in d) || (d[key] is int && d[key] > 0);
+    // A challenge sprint of n answers takes at least n × 0.8 s.
+    function optionalTime(d, key, n) {
+      return !(key in d) || (d[key] is int && d[key] >= n * 800);
+    }
+
+    function optionalCount(d, key, max) {
+      return !(key in d) || (d[key] is int && d[key] >= 0 && d[key] <= max);
+    }
+
+    // Learned lessons per era (eight eras; the biggest has fewer than 60 aesthetics).
+    function validEras(d) {
+      return !('eras' in d) || (d.eras is list && d.eras.size() == 8
+        && d.eras[0] is int && d.eras[1] is int && d.eras[2] is int && d.eras[3] is int
+        && d.eras[4] is int && d.eras[5] is int && d.eras[6] is int && d.eras[7] is int
+        && d.eras[0] >= 0 && d.eras[1] >= 0 && d.eras[2] >= 0 && d.eras[3] >= 0
+        && d.eras[4] >= 0 && d.eras[5] >= 0 && d.eras[6] >= 0 && d.eras[7] >= 0
+        && d.eras[0] <= 60 && d.eras[1] <= 60 && d.eras[2] <= 60 && d.eras[3] <= 60
+        && d.eras[4] <= 60 && d.eras[5] <= 60 && d.eras[6] <= 60 && d.eras[7] <= 60);
     }
 
     function validProfile(d) {
-      return d.keys().hasOnly(['nickname', 'avatar', 'lessonPoints', 'bestStreak', 'best25', 'best50', 'best100', 'correct', 'answered', 'updatedAt'])
+      return d.keys().hasOnly(['nickname', 'avatar', 'lessonPoints', 'bestStreak', 'best25', 'best50', 'best100', 'correct', 'answered', 'updatedAt',
+          'eras', 'dayStreak', 'goalDay', 'freezes', 'recent'])
         && d.keys().hasAll(['nickname', 'avatar', 'lessonPoints', 'bestStreak', 'correct', 'answered'])
         && d.nickname is string && d.nickname.size() >= 1 && d.nickname.size() <= 24
         && d.avatar is string && d.avatar.size() <= 100
-        && d.lessonPoints is int && d.lessonPoints >= 0 && d.lessonPoints <= 1000
-        && d.bestStreak is int && d.bestStreak >= 0 && d.bestStreak <= 100000
-        && optionalTime(d, 'best25') && optionalTime(d, 'best50') && optionalTime(d, 'best100')
+        // 174 aesthetics; learned counts 1, mastered 2
+        && d.lessonPoints is int && d.lessonPoints >= 0 && d.lessonPoints <= 400
+        && d.bestStreak is int && d.bestStreak >= 0 && d.bestStreak <= 10000
+        && optionalTime(d, 'best25', 25) && optionalTime(d, 'best50', 50) && optionalTime(d, 'best100', 100)
         && d.correct is int && d.answered is int
-        && d.correct >= 0 && d.correct <= d.answered;
+        && d.correct >= 0 && d.correct <= d.answered
+        // the journey through time: era progress, the day streak and moments for the circle feed
+        && validEras(d)
+        && optionalCount(d, 'dayStreak', 100000)
+        && optionalCount(d, 'freezes', 2)
+        && (!('goalDay' in d) || (d.goalDay is string && d.goalDay.matches('[0-9]{4}-[0-9]{2}-[0-9]{2}')))
+        && (!('recent' in d) || (d.recent is list && d.recent.size() <= 6));
     }
 
     match /config/allowlist {

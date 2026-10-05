@@ -1387,6 +1387,33 @@ button.row {
   margin-top: 4px;
 }
 
+.feed {
+  display: grid;
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.feed li {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.feed li.is-era strong:last-of-type {
+  color: var(--accent-text);
+}
+
+.circle-feed .section-title {
+  margin: 0;
+}
+
+.ranked .era-strip {
+  margin: 4px 0 2px;
+}
+
 .mode-list {
   display: grid;
   gap: 8px;

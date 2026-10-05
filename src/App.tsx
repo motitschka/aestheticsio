@@ -434,7 +434,7 @@ export default function App() {
         </div>
         {tab === 'progress' && <ProgressView aesthetics={aesthetics} items={saved.items} now={now} onLesson={openLesson} />}
         {tab === 'ranks' &&
-          (profile ? <Leaderboard byId={byId} total={aesthetics.length} me={profile.uid} load={listProfiles} /> : <LeaderboardSignIn onSignIn={signIn} error={signInError} />)}
+          (profile ? <Leaderboard all={aesthetics} byId={byId} me={profile.uid} load={listProfiles} /> : <LeaderboardSignIn onSignIn={signIn} error={signInError} />)}
         {tab === 'me' && (
           <Me
             account={
@@ -461,7 +461,7 @@ export default function App() {
         <nav className="tabbar">
           <TabButton id="play" label="Play" tab={tab} onTab={setTab} icon="play" />
           <TabButton id="progress" label="Lessons" tab={tab} onTab={setTab} icon="lessons" />
-          {backend && <TabButton id="ranks" label="Leaderboard" tab={tab} onTab={setTab} icon="ranks" />}
+          {backend && <TabButton id="ranks" label="Circle" tab={tab} onTab={setTab} icon="ranks" />}
           <TabButton id="me" label="Me" tab={tab} onTab={setTab} icon="me" />
         </nav>
       )}
