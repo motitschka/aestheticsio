@@ -1,5 +1,10 @@
 name: Deploy to GitHub Pages
 
+# The live site is built from main. The preview branch (repository variable
+# PREVIEW_BRANCH, default pin-refresh-2kmumy) is built in demo mode into /next/
+# next to it, so changes can be tried on a phone before friends see them.
+# Pushing to the preview branch re-runs this workflow (see preview.yml).
+
 on:
   push:
     branches: [main]
@@ -13,6 +18,9 @@ permissions:
 concurrency:
   group: pages
   cancel-in-progress: true
+
+env:
+  PREVIEW_BRANCH: ${{ vars.PREVIEW_BRANCH || 'pin-refresh-2kmumy' }}
 
 jobs:
   build:
@@ -33,6 +41,26 @@ jobs:
           VITE_FIREBASE_AUTH_DOMAIN: ${{ vars.VITE_FIREBASE_AUTH_DOMAIN }}
           VITE_FIREBASE_PROJECT_ID: ${{ vars.VITE_FIREBASE_PROJECT_ID }}
           VITE_FIREBASE_APP_ID: ${{ vars.VITE_FIREBASE_APP_ID }}
+
+      # ---- preview: the preview branch in demo mode at /next/ ----
+      - id: preview
+        run: |
+          if git ls-remote --exit-code --heads origin "$PREVIEW_BRANCH" > /dev/null; then echo "exists=true" >> "$GITHUB_OUTPUT"; else echo "No preview branch $PREVIEW_BRANCH"; fi
+      - if: steps.preview.outputs.exists == 'true'
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ env.PREVIEW_BRANCH }}
+          path: preview
+      - if: steps.preview.outputs.exists == 'true'
+        working-directory: preview
+        run: |
+          npm ci
+          npm test
+          npx tsc -b
+          # demo mode: no Firebase, nothing touches real accounts; own storage keys
+          VITE_STORAGE_PREFIX=next: npx vite build --mode demo
+          cp -r dist ../dist/next
+
       - uses: actions/upload-pages-artifact@v5
         with:
           path: dist
