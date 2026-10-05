@@ -12,8 +12,6 @@ on:
 
 permissions:
   contents: read
-  pages: write
-  id-token: write
 
 concurrency:
   group: pages
@@ -23,7 +21,42 @@ env:
   PREVIEW_BRANCH: ${{ vars.PREVIEW_BRANCH || 'pin-refresh-2kmumy' }}
 
 jobs:
+  # The preview builds on its own, with no deploy rights, and its failure never
+  # holds back the live site: /next/ is just left out.
+  preview:
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - id: branch
+        run: |
+          if git ls-remote --exit-code --heads "https://github.com/${GITHUB_REPOSITORY}.git" "$PREVIEW_BRANCH" > /dev/null; then echo "exists=true" >> "$GITHUB_OUTPUT"; else echo "No preview branch $PREVIEW_BRANCH"; fi
+      - if: steps.branch.outputs.exists == 'true'
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ env.PREVIEW_BRANCH }}
+          persist-credentials: false
+      - if: steps.branch.outputs.exists == 'true'
+        uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+      - if: steps.branch.outputs.exists == 'true'
+        run: |
+          npm ci
+          npm test
+          npx tsc -b
+          # demo mode: no Firebase, nothing touches real accounts; own storage keys
+          VITE_STORAGE_PREFIX=next: npx vite build --mode demo
+      - if: steps.branch.outputs.exists == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: preview
+          path: dist
+          retention-days: 1
+
   build:
+    needs: preview
+    if: ${{ !cancelled() }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
@@ -41,26 +74,12 @@ jobs:
           VITE_FIREBASE_AUTH_DOMAIN: ${{ vars.VITE_FIREBASE_AUTH_DOMAIN }}
           VITE_FIREBASE_PROJECT_ID: ${{ vars.VITE_FIREBASE_PROJECT_ID }}
           VITE_FIREBASE_APP_ID: ${{ vars.VITE_FIREBASE_APP_ID }}
-
-      # ---- preview: the preview branch in demo mode at /next/ ----
-      - id: preview
-        run: |
-          if git ls-remote --exit-code --heads origin "$PREVIEW_BRANCH" > /dev/null; then echo "exists=true" >> "$GITHUB_OUTPUT"; else echo "No preview branch $PREVIEW_BRANCH"; fi
-      - if: steps.preview.outputs.exists == 'true'
-        uses: actions/checkout@v7
+      - if: needs.preview.result == 'success'
+        uses: actions/download-artifact@v4
+        continue-on-error: true
         with:
-          ref: ${{ env.PREVIEW_BRANCH }}
-          path: preview
-      - if: steps.preview.outputs.exists == 'true'
-        working-directory: preview
-        run: |
-          npm ci
-          npm test
-          npx tsc -b
-          # demo mode: no Firebase, nothing touches real accounts; own storage keys
-          VITE_STORAGE_PREFIX=next: npx vite build --mode demo
-          cp -r dist ../dist/next
-
+          name: preview
+          path: dist/next
       - uses: actions/upload-pages-artifact@v5
         with:
           path: dist
@@ -68,6 +87,9 @@ jobs:
   deploy:
     needs: build
     runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}

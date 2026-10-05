@@ -41,7 +41,7 @@ interface Props {
 type Phase =
   | { k: 'choose' }
   | { k: 'steps'; format: LessonFormat }
-  | ({ k: 'done'; format: LessonFormat; perfect: boolean } & LessonOutcome)
+  | ({ k: 'done'; format: LessonFormat; perfect: boolean; incomplete: boolean } & LessonOutcome)
 
 export function Lesson({ aesthetic: a, all, byId, entry, state, onFinish, theme, themeInUse, onUseTheme, onClose }: Props) {
   // The first time is always the full lesson; after that, info and questions are separate.
@@ -67,12 +67,12 @@ export function Lesson({ aesthetic: a, all, byId, entry, state, onFinish, theme,
           byId={byId}
           format={phase.format}
           onAsking={setAsking}
-          onDone={(perfect) => {
+          onDone={(perfect, incomplete) => {
             const change: LessonOutcome =
               phase.format === 'info'
                 ? { before: state, after: state, unlocked: false, goalMet: false, freezeEarned: false, dayStreak: 0, erasFinished: [] }
                 : onFinish(perfect)
-            setPhase({ k: 'done', format: phase.format, perfect, ...change })
+            setPhase({ k: 'done', format: phase.format, perfect, incomplete, ...change })
           }}
         />
       )}
@@ -119,7 +119,8 @@ function Steps({ a, all, byId, format, onDone, onAsking }: {
   all: Aesthetic[]
   byId: Map<string, Aesthetic>
   format: LessonFormat
-  onDone(perfect: boolean): void
+  /** perfect: every check right first time; incomplete: some checks never got their pictures */
+  onDone(perfect: boolean, incomplete: boolean): void
   onAsking(asking: boolean): void
 }) {
   // Built once per lesson run, so a late-loading list (pins arrive with the themes) can't reshuffle it.
@@ -127,6 +128,8 @@ function Steps({ a, all, byId, format, onDone, onAsking }: {
   const [queue, setQueue] = useState<QueueItem[]>(() => initial.map((step) => ({ step, retry: false })))
   const [index, setIndex] = useState(0)
   const [mistakes, setMistakes] = useState(0)
+  // Checks skipped twice because their pictures didn't load: not a mistake, but not passed either.
+  const [unanswered, setUnanswered] = useState(0)
 
   const current = queue[index]
   const total = queue.length
@@ -134,18 +137,24 @@ function Steps({ a, all, byId, format, onDone, onAsking }: {
   useEffect(() => onAsking(isQuestion), [isQuestion, onAsking])
 
   const next = useCallback(() => {
-    if (index + 1 >= queue.length) onDone(mistakes === 0)
+    if (index + 1 >= queue.length) onDone(mistakes === 0 && unanswered === 0, unanswered > 0)
     else {
       setIndex(index + 1)
       window.scrollTo({ top: 0 })
     }
-  }, [index, queue.length, mistakes, onDone])
+  }, [index, queue.length, mistakes, unanswered, onDone])
 
   // A check whose image didn't load is asked again at the end, with other images,
   // so a lesson is never learned without its checks. Once is enough: a second miss
   // of the network just moves on.
   const skip = () => {
-    if (current?.step.type !== 'question' || current.skipped) return next()
+    if (current?.step.type !== 'question') return next()
+    if (current.skipped) {
+      // next() is memoised on the old count, so finish here when this was the last step.
+      setUnanswered((n) => n + 1)
+      if (index + 1 >= queue.length) return onDone(false, true)
+      return next()
+    }
     const again: QueueItem = { step: { type: 'question', question: rebuildLessonQuestion(current.step.question, all) }, retry: current.retry, skipped: true }
     // Not next(): it would still see the queue without the check just added.
     setQueue((items) => [...items, again])
@@ -323,10 +332,12 @@ export function InfoView({ card, a, byId }: { card: InfoCard; a: Aesthetic; byId
   }
 }
 
-export function Done({ a, format, perfect, before, after, unlocked, goalMet, freezeEarned, dayStreak, erasFinished, theme, themeInUse, onUseTheme, onAgain, onClose }: {
+export function Done({ a, format, perfect, incomplete = false, before, after, unlocked, goalMet, freezeEarned, dayStreak, erasFinished, theme, themeInUse, onUseTheme, onAgain, onClose }: {
   a: Aesthetic
   format: LessonFormat
   perfect: boolean
+  /** some checks were skipped because their pictures didn't load */
+  incomplete?: boolean
   theme?: Theme
   themeInUse: boolean
   onUseTheme(id: string): void
@@ -349,6 +360,9 @@ export function Done({ a, format, perfect, before, after, unlocked, goalMet, fre
     text = `${a.name} stays learned. A mistake starts its month again before it can be mastered.`
   } else if (perfect) {
     text = after === 'mastered' ? `${a.name} stays mastered.` : `Every question right. ${a.name} stays ${LESSON_LABEL[after].toLowerCase()}.`
+  } else if (incomplete) {
+    headline = changed ? 'Seen' : 'Lesson complete'
+    text = `Some pictures didn’t load, so a few checks were skipped. Take it again to learn ${a.name}.`
   } else {
     headline = changed ? 'Seen' : 'Lesson complete'
     text = `You finished, with some retries. Get every question right first time to learn ${a.name}.`

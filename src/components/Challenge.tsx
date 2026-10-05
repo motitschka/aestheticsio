@@ -73,14 +73,16 @@ export function Challenge({ all, byId, target, onEnd, onLesson, loadRank, onAgai
 
   // Leaving mid-run still counts the streak so far: no mistake was made. That
   // includes leaving the page itself (the back gesture, closing the tab).
-  const live = useRef({ streak, splits, ended: false })
+  // The run is recorded again only when it has grown since it was last recorded (a
+  // page restored from the back-forward cache carries on, and can record more).
+  const live = useRef({ streak, splits, ended: false, recorded: 0 })
   useEffect(() => {
-    live.current = { streak, splits, ended: live.current.ended || !!end }
+    live.current = { ...live.current, streak, splits, ended: live.current.ended || !!end }
   }, [streak, splits, end])
   const recordSoFar = useCallback(() => {
-    const { streak: s, splits: sp, ended } = live.current
-    if (ended || s === 0) return
-    live.current.ended = true
+    const { streak: s, splits: sp, ended, recorded } = live.current
+    if (ended || s <= recorded) return
+    live.current.recorded = s
     onEnd(s, sp)
   }, [onEnd])
   useEffect(() => {
