@@ -8,7 +8,7 @@ web
 
 ## Users
 
-The owner and the friends they invite, plus anyone who opens the link and plays as a guest. They use it on their phones in short sessions to learn to recognise, name and tell apart design aesthetics.
+A circle of friends: the owner and the friends they invite (anyone with the link can still play as a guest). They use it on their phones in short sessions to learn to recognise, name and tell apart design aesthetics, and the goal is that they finish all 174.
 
 ## Product Purpose
 
@@ -20,16 +20,17 @@ Every lesson, question and image comes from the Aesthetics Wiki itself (intro, i
 
 ## Operating Context
 
-- Phone-first web app, also used on desktop. Hosted on GitHub Pages at https://motitschka.github.io/aestheticsio/.
-- Short sessions: a lesson, a round of 10, or a timed challenge.
+- Phone-first web app, also used on desktop. Hosted on GitHub Pages at https://motitschka.github.io/aestheticsio/ (a demo-mode preview of the next version at /next/).
+- Short sessions: a lesson, a round of 10, or a timed challenge. A daily goal of one lesson keeps a day streak.
 - Guests keep progress in their browser; invited friends sign in with Google (Firebase) to sync and join the leaderboard.
 
 ## Capabilities and Constraints
 
-- Lessons per aesthetic (info cards and questions; tiers seen, learned, mastered), seven practice modes, a Mixed challenge (endless, 25, 50, 100) with badges, a two-tab leaderboard, profiles with aesthetic avatars.
+- A journey through time: eight eras (before 1900 to now), walked oldest first; finishing means every lesson learned.
+- Lessons per aesthetic (info cards, then checks against its close relatives; tiers seen, learned, mastered; learned is never lost), seven practice modes, a Mixed challenge (endless, 25, 50, 100) with badges, the circle (a feed of friends' moments, era progress, day streaks, best streaks), profiles with aesthetic avatars.
 - 174 themes, one per aesthetic, unlocked by learning its lesson; chosen under Me, applied app-wide.
 - Wiki text is CC BY-SA and must stay credited. Images are hotlinked from Fandom's server, never re-hosted.
-- The user's Pinterest boards (`pinterest/`, git-ignored at full size) are each theme's inspiration and imagery. Resized copies in `public/pins/` are published with the public site by the owner's choice: theme backgrounds, moodboard strips and framed decoration. Wiki photos are used only for questions and lessons.
+- The user's Pinterest boards (`pinterest/`, git-ignored at full size) are each theme's inspiration and imagery. Resized copies in `public/pins/` are published with the public site by the owner's choice: theme backgrounds, moodboard strips, framed decoration, and the unseen images that lesson checks ask about. Wiki photos teach (lesson galleries) and are used in practice.
 - Free tiers only: GitHub Pages, Firebase Spark.
 
 ## Brand Commitments
@@ -48,6 +49,6 @@ Every lesson, question and image comes from the Aesthetics Wiki itself (intro, i
 ## Product Principles
 
 1. The aesthetics are the content; the interface frames them and never competes with their images.
-2. Learning is earned: progress, tiers and themes reflect real recall, not taps.
+2. Learning is earned: progress, tiers and themes reflect real recall, not taps. Nothing outside the player's control (a picture that didn't load) counts against them.
 3. Every aesthetic is treated with equal care, from Art Deco to Dollar Store Vernacular.
 4. Quick to start, quick to finish: every session works in a minute on a phone.

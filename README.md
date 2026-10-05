@@ -6,15 +6,23 @@ on the Aesthetics Wiki.
 
 **Play it:** https://motitschka.github.io/aestheticsio/
 
+- **A journey through time:** the 174 aesthetics are grouped into eight eras
+  (before 1900, 1900–1945, 1945–1970, the 70s, 80s, 90s, 2000s, 2010s and now;
+  `src/lib/eras.ts`), and the next lesson walks them oldest first. Every era is
+  open; Play and Lessons show how far you are in each. Learning all 174 finishes
+  the journey; mastering them is the next lap.
 - **Lessons:** one per aesthetic, built from the wiki (intro, gallery, motifs,
-  colours, decade, values, related aesthetics) with questions in between: type the
-  name, pick its colours, motifs and decade. Missed questions come back at the end.
-  After the first time you choose *info only* or *questions only*.
-  - **Seen** = finished, **learned** = every question right in one go,
-    **mastered** = perfect again at least 30 days later (permanent). Learned drops
-    back to seen after a mistake.
-  - Overall %: learned counts 1, mastered 2, so 100% = every lesson learned and
-    200% = every lesson mastered.
+  colours, decade, values, related aesthetics) with checks in between, all about
+  telling it apart from its close relatives on images the lesson hasn't shown (the
+  aesthetic's board pins): spot it among its relatives, find the odd one out, say
+  which of the relatives an image is, and pick its colours, motifs and decade
+  against its relatives'. Missed checks come back at the end. After the first time
+  you choose *info only* or *questions only*.
+  - **Seen** = finished, **learned** = every check right in one go (unlocks the
+    theme), **mastered** = perfect again at least 30 days later. Learned and
+    mastered are never lost; a mistake only restarts the month before mastery.
+- **Daily goal:** one lesson a day builds a day streak. A second lesson in a day
+  banks a freeze (up to two), and a freeze covers a day you miss.
 - **Practice modes** (rounds of 10): image → name, name → image, description → name,
   clues → name, tell them apart (related aesthetics), odd one out, timeline. An
   aesthetic is *recognised* in a mode after 3 right in a row there.
@@ -26,8 +34,9 @@ on the Aesthetics Wiki.
   everything: colours (taken from the pins), display and body fonts, button and
   card shapes, a drawn pattern, motion, icons and layout (tab bar, rail, window
   chrome, zine, terminal…). Its pins show as a collage behind every screen, as a
-  moodboard strip on Play, Lessons and Me, and framed beside scores. Quiz and
-  lesson pictures still come from the wiki. Pick one under **Me → Themes**.
+  moodboard strip on Play, Lessons and Me, and framed beside scores. Lesson
+  galleries and practice pictures come from the wiki; lesson checks use the pins.
+  Pick one under **Me → Themes**.
 - **Welcome intro:** the first visit opens with a live, interactive intro built from
   the app itself (`src/intro/`): a welcome on a wall of pins, then a real quiz the
   visitor answers ("Which aesthetic is this?", it waits for them), Frutiger Aero's
@@ -39,9 +48,13 @@ on the Aesthetics Wiki.
   **Me → Watch the intro**. A shareable video cut of it (no wiki photos) is rendered
   from the same code in dev with `?intro-video=portrait` or `landscape`.
 - **Play without signing in:** guest progress is saved in the browser.
-- **Or sign in with Google (invite only):** progress syncs across devices and you
-  join the friends leaderboard (lessons % and best streak). Guest progress comes
-  with you the first time you sign in.
+- **Or sign in with Google (invite only):** progress syncs across devices (live,
+  and records never go backwards) and you join the circle: a feed of what friends
+  just learned and which eras they finished, each friend's era progress and day
+  streak, and the best-streak board. Guest progress comes with you the first time
+  you sign in.
+- **A missing picture never counts against you:** if an image doesn't load, the
+  question can be skipped and an answer to it isn't scored.
 - **Stack:** Vite + React + TypeScript on GitHub Pages; Firebase Auth (Google) and
   Firestore on the free Spark plan for sign-in, sync and the leaderboard. Wiki
   images load directly from Fandom; theme pins are served from `public/pins/`.
@@ -62,6 +75,19 @@ friends on the leaderboard. `npm run dev` uses your real Firebase config from
 Every push to `main` runs `.github/workflows/deploy.yml`: tests, build, and publish
 to GitHub Pages at `https://<user>.github.io/<repo>/`. Without Firebase config the
 site is guest-only.
+
+**Preview first:** the same deploy also builds the preview branch (repository
+variable `PREVIEW_BRANCH`, default `pin-refresh-2kmumy`) in demo mode at
+`https://<user>.github.io/<repo>/next/`. It never touches Firebase and keeps its own
+browser storage, so it can be tried on a phone before friends see it. Pushing to the
+preview branch rebuilds it (`.github/workflows/preview.yml`, which also runs lint,
+tests and the build on every branch and pull request). Delete the branch and the
+preview goes away with the next deploy.
+
+**When the Firestore rules change** (as they did for the journey), deploy them:
+`npm run set-admin -- you@gmail.com && npm run deploy:rules`, then undo the email
+in `firestore.rules` (`git checkout firestore.rules`) so it isn't committed. Until
+then the app keeps working with the old rules and just leaves out the new fields.
 
 ## Turning on sign-in (one time)
 
@@ -97,7 +123,7 @@ site is guest-only.
 | --- | --- |
 | `npm run dev` | Local dev server (uses `.env.local`) |
 | `npm run dev:demo` | Local dev server with the in-browser demo backend |
-| `npm test` | Quiz logic tests |
+| `npm test` | Quiz, progress and journey logic tests |
 | `npm run test:rules` | Firestore security rules tests (needs Java 21+) |
 | `npm run fetch-data` | Re-download the aesthetics into `data/aesthetics.json`; commit and push to publish |
 | `npm run make-pins` | Resize the Pinterest boards in `pinterest/<Aesthetic name>/` (local, not committed) into `public/pins/<id>/` |
@@ -109,9 +135,10 @@ site is guest-only.
 - The site and the aesthetics data are public; anyone with the link can play as a guest.
   Guests never touch the database.
 - `firestore.rules` decides who can sign in for real: the owner (`adminEmail()`)
-  manages the allowlist; allowlisted accounts read everyone's leaderboard profile
-  (nickname, avatar, learned count, accuracy) and only their own progress. Anyone
-  else who signs in is told they're not on the list and can keep playing as a guest.
+  manages the allowlist; allowlisted accounts read everyone's circle profile
+  (nickname, avatar, learned per era, day streak, recent moments, accuracy) and only
+  their own progress. Anyone else who signs in is told they're not on the list and
+  can keep playing as a guest.
 
 Leaderboard numbers are reported by each player's browser, so a determined
 friend could fake theirs. That's fine among friends.
