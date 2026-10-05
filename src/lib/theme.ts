@@ -131,9 +131,9 @@ const EXTRA = ['--font', '--font-display', '--display-scale', '--glow', '--shado
  * big titles and numbers; quiz prompts and lesson headings use the body face.
  */
 const DECORATIVE = new Set([
-  'Bungee Inline', 'Creepster', 'Dancing Script', 'Great Vibes', 'Kaushan Script', 'Long Cang', 'Ma Shan Zheng',
+  'Bungee Inline', 'Bungee Shade', 'Creepster', 'Dancing Script', 'Great Vibes', 'Kaushan Script', 'Long Cang', 'Ma Shan Zheng',
   'MedievalSharp', 'Metal Mania', 'Monoton', 'Pacifico', 'Pirata One', 'Rock Salt', 'Rubik Dirt', 'Rubik Glitch',
-  'Rubik Spray Paint', 'Saira Stencil One', 'Satisfy', 'Uncial Antiqua', 'UnifrakturMaguntia',
+  'Rubik Spray Paint', 'Saira Stencil One', 'Sancreek', 'Satisfy', 'Uncial Antiqua', 'UnifrakturMaguntia',
 ])
 
 /** A lesson's theme unlocks when it's learned, and stays unlocked. */

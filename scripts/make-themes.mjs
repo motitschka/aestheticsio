@@ -62,7 +62,7 @@ for (const [i, a] of data.items.entries()) {
   }
   const points = (await Promise.all(files.map(pixels))).flat()
   const meanL = points.reduce((s, p) => s + p[0], 0) / points.length
-  const { dark, colours: base, swatches, glow } = themeColours(kmeans(points), meanL, design.dark, design.accent)
+  const { dark, colours: base, swatches, glow } = themeColours(kmeans(points), meanL, design.dark, design.accent, design.paper)
   const colours = { ...base, ...gloss(base) }
   const { font, body, buttons, layout, icons, motion, pattern, caps } = design
   for (const [ink, grounds, min] of PAIRS)

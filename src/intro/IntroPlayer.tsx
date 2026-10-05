@@ -371,12 +371,14 @@ export function IntroPlayer({ mode, onDone }: { mode: IntroMode; onDone(): void 
             })
             break
           case 'corporate-grunge':
-            // filed in row by row, hard and fast, with a jolt
+            // a Ray Gun spread: pins flicker in out of register, then snap square, with a jolt
             style(b, (1 - out), `translateX(${Math.sin(k * 90) * L.u(4) * (1 - clamp(k / 0.3))}px)`)
             tiles.forEach((tile, n) => {
-              const e = p(k, Math.floor(n / cols) * 0.045, Math.floor(n / cols) * 0.045 + 0.16)
-              tile.style.transform = `translateX(${-(1 - e) * L.W * 0.7}px)`
-              tile.style.opacity = e > 0 ? '1' : '0'
+              const d = ((n * 11) % 9) * 0.03
+              const snap = k >= d + 0.22 ? 0 : 1
+              const flicker = k >= d && (k >= d + 0.1 || Math.floor((k - d) * 40) % 2 === 0)
+              tile.style.transform = `translate(${snap * (((n * 17) % 11) - 5) * L.u(3)}px, ${snap * (((n * 13) % 7) - 3) * L.u(3)}px) rotate(${snap * (((n * 7) % 9) - 4) * 1.5}deg)`
+              tile.style.opacity = flicker ? '1' : '0'
             })
             break
           case 'parisian-girly':

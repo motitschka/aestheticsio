@@ -130,7 +130,7 @@ export function kmeans(points, k = 8, iterations = 14) {
  */
 export const hexToLch = (h) => lch(rgbToOklab([1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16))))
 
-export function themeColours(clusters, meanL, forceDark, accentHex) {
+export function themeColours(clusters, meanL, forceDark, accentHex, paper) {
   const withLch = clusters.map((c) => ({ ...c, lch: lch(c.lab) }))
   const dark = forceDark ?? meanL < 0.42
   const tinted = withLch.filter((c) => c.lch[1] > 0.03)
@@ -146,8 +146,9 @@ export function themeColours(clusters, meanL, forceDark, accentHex) {
   // Tint the background with the main colour when it's clearly coloured,
   // otherwise with the accent (photos are often dominated by beige and wood).
   const h = dominant[1] > 0.06 ? dominant[2] : accent[2]
-  // A deliberately grey accent (e.g. Monochrome Luxe) gets a neutral background too.
-  const tint = accentHex && accent[1] < 0.03 ? 0.004 : Math.min(0.045, Math.max(dominant[1], accent[1]) * 0.4 + 0.008)
+  // A deliberately grey accent (e.g. Monochrome Luxe) gets a neutral background too,
+  // as do boards of black ink on plain paper, whose accent is only a spot colour.
+  const tint = paper || (accentHex && accent[1] < 0.03) ? 0.004 : Math.min(0.045, Math.max(dominant[1], accent[1]) * 0.4 + 0.008)
   const ah = accent[2]
   const C = Math.min(accent[1], 0.2)
 

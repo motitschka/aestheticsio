@@ -464,7 +464,7 @@ h2 {
   }
 }
 
-.photo-error {
+.photo > .photo-error {
   position: absolute;
   inset: 0;
   display: grid;
@@ -1360,12 +1360,12 @@ button.row {
 
 .badge-icon.is-streak.is-earned {
   background: #fde7d6;
-  color: #c2410c;
+  color: #9a3412;
 }
 
 .badge-icon.is-speed.is-earned {
   background: #fdf3c7;
-  color: #a16207;
+  color: #854d0e;
 }
 
 @media (prefers-color-scheme: dark) {
