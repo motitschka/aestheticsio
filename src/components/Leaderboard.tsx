@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { ERAS, eraProgress } from '../lib/eras'
 import { ago, formatTime } from '../lib/format'
-import { accuracy, dayStreakNow, learnedCount, rankByLessons, rankByStreak } from '../lib/progress'
+import { accuracy, dayStreakNow, friendDayStreak, learnedCount, rankByLessons, rankByStreak } from '../lib/progress'
 import type { Aesthetic, CircleEvent, Profile } from '../types'
 import { Avatar } from './Avatar'
 import { BadgeRow } from './Badges'
@@ -90,7 +90,7 @@ export function Leaderboard({ all, byId, me, load }: Props) {
               {board === 'journey' ? (
                 <>
                   {p.eras ? <EraStrip learned={p.eras} totals={totals} /> : <span className="muted small">No journey yet</span>}
-                  <span className="muted small">{journeyLine(p, now)}</span>
+                  <span className="muted small">{journeyLine(p, now, p.uid === me)}</span>
                 </>
               ) : (
                 <>
@@ -117,11 +117,11 @@ function moment(e: CircleEvent, byId: Map<string, Aesthetic>) {
   )
 }
 
-function journeyLine(p: Profile, now: number) {
+function journeyLine(p: Profile, now: number, mine: boolean) {
   const parts: string[] = []
-  const streak = dayStreakNow(p, now)
+  const streak = mine ? dayStreakNow(p, now) : friendDayStreak(p, now)
   if (streak) parts.push(`${streak}-day streak`)
-  const mastered = p.lessonPoints - learnedCount(p)
+  const mastered = p.eras ? p.lessonPoints - learnedCount(p) : 0
   if (mastered > 0) parts.push(`${mastered} mastered`)
   if (p.answered) parts.push(`${Math.round(accuracy(p) * 100)}% practice accuracy`)
   return parts.join(' · ') || 'Just starting'

@@ -103,11 +103,17 @@ export const lessonsToday = (s: Pick<PlayerStats, 'today'>, now: number) => (s.t
  * The day streak as it stands now. It survives missed days as long as there
  * are freezes to cover them (they're used up when the goal is next met).
  */
-export function dayStreakNow(s: Pick<PlayerStats, 'goalDay' | 'dayStreak' | 'freezes'>, now: number): number {
+export function dayStreakNow(s: Pick<PlayerStats, 'goalDay' | 'dayStreak' | 'freezes'>, now: number, graceDays = 0): number {
   if (!s.goalDay || !s.dayStreak) return 0
-  const missed = daysBetween(s.goalDay, dayKey(now)) - 1
+  const missed = daysBetween(s.goalDay, dayKey(now)) - 1 - graceDays
   return missed <= (s.freezes ?? 0) ? s.dayStreak : 0
 }
+
+/**
+ * A friend's streak, seen from here. Their day may not be over yet in their
+ * time zone, so it gets a day's grace.
+ */
+export const friendDayStreak = (s: Pick<PlayerStats, 'goalDay' | 'dayStreak' | 'freezes'>, now: number) => dayStreakNow(s, now, 1)
 
 /** Freezes that will be used up to keep the streak alive when the goal is next met. */
 export function freezesNeeded(s: Pick<PlayerStats, 'goalDay'>, now: number) {
@@ -128,7 +134,8 @@ export function applyDailyLesson(stats: PlayerStats, now: number): DailyOutcome 
   const next: PlayerStats = { ...stats, today: { d, n } }
   let goalMet = false
   let freezeEarned = false
-  if (n === DAILY_GOAL && stats.goalDay !== d) {
+  // A goal day after today (travel west, a clock change) counts as today's goal already met.
+  if (n === DAILY_GOAL && !(stats.goalDay && stats.goalDay >= d)) {
     let streak = 1
     let freezes = stats.freezes ?? 0
     if (stats.goalDay) {
@@ -256,8 +263,12 @@ export function profileFrom(base: Pick<Profile, 'uid' | 'nickname' | 'avatar'>, 
   return p
 }
 
-/** Lessons learned (or mastered), from a profile's era counts. */
-export const learnedCount = (p: Pick<Profile, 'eras'>) => (p.eras ?? []).reduce((n, x) => n + x, 0)
+/**
+ * Lessons learned (or mastered), from a profile's era counts. A profile saved
+ * without them (before the journey's rules were deployed) falls back to its
+ * lesson points, which match while nothing is mastered.
+ */
+export const learnedCount = (p: Pick<Profile, 'eras' | 'lessonPoints'>) => (p.eras ? p.eras.reduce((n, x) => n + x, 0) : p.lessonPoints)
 
 export const accuracy = (p: { correct: number; answered: number }) => (p.answered ? p.correct / p.answered : 0)
 
@@ -309,7 +320,11 @@ function mergeEntry(a: Entry, b: Entry): Entry {
   return e
 }
 
-/** The daily-goal fields of whichever record met its goal last. */
+/**
+ * The daily-goal fields of whichever record met its goal last. On the same day
+ * (the same account on two devices) the streak and freezes can only have grown,
+ * so the larger of each wins.
+ */
 function laterDaily(a: PlayerStats, b: PlayerStats): Partial<PlayerStats> {
   const pick = (b.goalDay ?? '') > (a.goalDay ?? '') ? b : a
   const out: Partial<PlayerStats> = {}
@@ -317,6 +332,10 @@ function laterDaily(a: PlayerStats, b: PlayerStats): Partial<PlayerStats> {
     out.goalDay = pick.goalDay
     out.dayStreak = pick.dayStreak
     out.freezes = pick.freezes
+    if (a.goalDay === b.goalDay) {
+      out.dayStreak = Math.max(a.dayStreak ?? 0, b.dayStreak ?? 0)
+      out.freezes = Math.max(a.freezes ?? 0, b.freezes ?? 0)
+    }
   }
   const best = Math.max(a.bestDayStreak ?? 0, b.bestDayStreak ?? 0)
   if (best) out.bestDayStreak = best
@@ -333,6 +352,22 @@ function mergeRecent(a: CircleEvent[] = [], b: CircleEvent[] = []): CircleEvent[
   return out.length ? out : undefined
 }
 
+/**
+ * A guest's streak that began after the account's last goal day carries the
+ * account's streak on, if freezes cover the days between.
+ */
+function continuedStreak(account: PlayerStats, guest: PlayerStats): Partial<PlayerStats> | null {
+  if (!account.goalDay || !guest.goalDay || guest.goalDay <= account.goalDay || !account.dayStreak || !guest.dayStreak) return null
+  const missed = daysBetween(account.goalDay, guest.goalDay) - guest.dayStreak
+  if (missed < 0 || missed > (account.freezes ?? 0)) return null
+  const dayStreak = account.dayStreak + guest.dayStreak
+  return {
+    dayStreak,
+    freezes: Math.min(MAX_FREEZES, (account.freezes ?? 0) - missed + (guest.freezes ?? 0)),
+    bestDayStreak: Math.max(account.bestDayStreak ?? 0, guest.bestDayStreak ?? 0, dayStreak),
+  }
+}
+
 /** Combines guest progress into an account's. */
 export function mergeSaved(account: SavedProgress, guest: SavedProgress): SavedProgress {
   const items = { ...account.items }
@@ -344,6 +379,7 @@ export function mergeSaved(account: SavedProgress, guest: SavedProgress): SavedP
     timelineTotal: a.timelineTotal + g.timelineTotal,
     bestStreak: Math.max(a.bestStreak, g.bestStreak),
     ...laterDaily(a, g),
+    ...continuedStreak(a, g),
   }
   const theme = a.theme || g.theme
   if (theme) stats.theme = theme

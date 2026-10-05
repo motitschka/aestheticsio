@@ -12,7 +12,7 @@ const videoCut = import.meta.env.DEV ? new URLSearchParams(location.search).get(
 function firstVisit(): boolean {
   try {
     if (localStorage.getItem(SEEN_KEY) === '1') return false
-    if (localStorage.getItem(storageKey('guest')) || localStorage.getItem(storageKey('guest-progress'))) return false
+    if (localStorage.getItem(storageKey('guest')) || localStorage.getItem(storageKey('guest-progress')) || localStorage.getItem(storageKey('guest-journey'))) return false
     if (matchMedia('(prefers-reduced-motion: reduce)').matches) return false
     if ((navigator as Navigator & { connection?: { saveData?: boolean } }).connection?.saveData) return false
     return true

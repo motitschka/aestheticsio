@@ -6,6 +6,8 @@ import {
   applyDailyLesson,
   dayKey,
   dayStreakNow,
+  friendDayStreak,
+  learnedCount,
   emptyStats,
   freshStart,
   hasProgress,
@@ -105,6 +107,20 @@ describe('daily goal', () => {
     expect(s.bestDayStreak).toBe(2)
   })
 
+  it('a lesson on a local day before the goal day (travelling west) changes nothing', () => {
+    const s = lesson(lesson(lesson(emptyStats(), 0), 1), 2) // streak 3, goal day = day 2
+    const west = applyDailyLesson(s, at(1))
+    expect(west.goalMet).toBe(false)
+    expect(west.stats).toMatchObject({ goalDay: s.goalDay, dayStreak: 3 })
+  })
+
+  it("a friend's streak gets a day's grace for time zones; your own doesn't", () => {
+    const s = lesson(emptyStats(), 0)
+    expect(dayStreakNow(s, at(2))).toBe(0)
+    expect(friendDayStreak(s, at(2))).toBe(1)
+    expect(friendDayStreak(s, at(3))).toBe(0)
+  })
+
   it('counts days by the local calendar', () => {
     expect(dayKey(new Date(2026, 0, 31, 23, 59).getTime())).toBe('2026-01-31')
     expect(dayKey(new Date(2026, 1, 1, 0, 1).getTime())).toBe('2026-02-01')
@@ -143,6 +159,21 @@ describe('sync between devices', () => {
     expect(merged.stats).toMatchObject({ goalDay: '2026-10-05', dayStreak: 4, freezes: 1 })
   })
 
+  it('on the same goal day, a freeze earned on the other device is kept', () => {
+    const here = base({ goalDay: '2026-10-05', dayStreak: 7, freezes: 0, today: { d: '2026-10-05', n: 1 } })
+    const there = base({ goalDay: '2026-10-05', dayStreak: 7, freezes: 1, today: { d: '2026-10-05', n: 2 } })
+    expect(syncMerge(here, there).stats).toMatchObject({ dayStreak: 7, freezes: 1, today: { n: 2 } })
+    expect(syncMerge(there, here).stats).toMatchObject({ dayStreak: 7, freezes: 1, today: { n: 2 } })
+  })
+
+  it("a guest's new streak carries on the account's when freezes cover the gap", () => {
+    const account = base({ goalDay: '2026-10-03', dayStreak: 50, freezes: 1, bestDayStreak: 50 })
+    const guest = base({ goalDay: '2026-10-05', dayStreak: 1, freezes: 0 }) // missed 10-04, covered by the freeze
+    expect(mergeSaved({ items: {}, stats: account.stats }, { items: {}, stats: guest.stats }).stats).toMatchObject({ goalDay: '2026-10-05', dayStreak: 51, freezes: 0, bestDayStreak: 51 })
+    const broke = base({ goalDay: '2026-10-06', dayStreak: 1 }) // two missed days, one freeze
+    expect(mergeSaved({ items: {}, stats: account.stats }, { items: {}, stats: broke.stats }).stats).toMatchObject({ dayStreak: 1 })
+  })
+
   it('a fresh start on the server wins over a device holding old progress', () => {
     const stale: SavedProgress = { items: { x: { lt: 2, c: 0, w: 0, t: 0 } }, stats: emptyStats() }
     expect(syncMerge(stale, freshStart(true))).toEqual(freshStart(true))
@@ -159,6 +190,19 @@ describe('sync between devices', () => {
 })
 
 // Keeps the real data and the eras in step: a wiki refresh that renames an aesthetic shows up here.
+describe('profiles', () => {
+  it('without era counts (old rules), learned falls back to lesson points', () => {
+    expect(learnedCount({ lessonPoints: 5 })).toBe(5)
+    expect(learnedCount({ lessonPoints: 7, eras: [3, 2, 0, 0, 0, 0, 0, 0] })).toBe(5)
+  })
+
+  it('a fresh-start profile starts from zero, whatever the old one had', () => {
+    const p = profileFrom({ uid: 'u', nickname: 'N', avatar: 'a' }, freshStart(true), all)
+    expect(p).toMatchObject({ lessonPoints: 0, bestStreak: 0, correct: 0, answered: 0 })
+    expect(p.best25).toBeUndefined()
+  })
+})
+
 describe('data', () => {
   it('ids are unique', () => {
     expect(new Set(all.map((a: Aesthetic) => a.id)).size).toBe(all.length)

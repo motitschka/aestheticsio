@@ -19,12 +19,13 @@ import {
   onSnapshot,
   persistentLocalCache,
   persistentMultipleTabManager,
+  runTransaction,
   serverTimestamp,
   setDoc,
   writeBatch,
 } from 'firebase/firestore'
 import { normalizeSaved } from '../lib/progress'
-import type { Profile } from '../types'
+import type { CircleEvent, Profile } from '../types'
 import { NoAccessError, type Backend } from './types'
 
 const env = import.meta.env
@@ -100,7 +101,9 @@ export function createFirebaseBackend(): Backend {
     async loadProgress(uid) {
       try {
         const snap = await getDoc(doc(db, 'progress', uid))
-        return normalizeSaved(snap.data() ?? {})
+        const data = snap.data() ?? {}
+        // The journey lives in its own field; the rest of the document is the record from before it.
+        return normalizeSaved(data.journey ?? data)
       } catch (err) {
         if (denied(err)) throw new NoAccessError()
         throw err
@@ -110,28 +113,38 @@ export function createFirebaseBackend(): Backend {
     async saveProgress(uid, patch, profile) {
       await withOldRules(profile, (p) => {
         const batch = writeBatch(db)
-        batch.set(doc(db, 'progress', uid), patch, { merge: true })
+        batch.set(doc(db, 'progress', uid), { journey: patch }, { merge: true })
         if (p) batch.set(doc(db, 'profiles', uid), profileDoc(p))
         return batch.commit()
       })
     },
 
-    async startFresh(uid, next, backup, profile) {
-      await withOldRules(profile, (p) => {
-        const batch = writeBatch(db)
-        // No merge: the old items go; the backup keeps them (only its owner can read it).
-        batch.set(doc(db, 'progress', uid), { ...next, backupV1: { ...backup, at: Date.now() } })
-        if (p) batch.set(doc(db, 'profiles', uid), profileDoc(p))
-        return batch.commit()
-      })
+    async startFresh(uid, next, profile) {
+      const ref = doc(db, 'progress', uid)
+      // A transaction reads from the server (and fails offline), so a stale cached
+      // copy can never start a journey over one another device already began.
+      return withOldRules(profile, (p) =>
+        runTransaction(db, async (tx) => {
+          const snap = await tx.get(ref)
+          const started = snap.data()?.journey
+          if (started) return normalizeSaved(started)
+          tx.set(ref, { journey: next }, { merge: true })
+          if (p) tx.set(doc(db, 'profiles', uid), profileDoc(p))
+          return next
+        }),
+      )
     },
 
     watchProgress(uid, cb) {
       return onSnapshot(
         doc(db, 'progress', uid),
+        // Metadata changes too: a change from elsewhere that arrives while one of
+        // ours is pending is only delivered again once the server confirms it.
+        { includeMetadataChanges: true },
         (snap) => {
           // Our own writes come back too; only what the server has confirmed counts.
-          if (!snap.metadata.hasPendingWrites) cb(normalizeSaved(snap.data() ?? {}))
+          const journey = snap.data()?.journey
+          if (!snap.metadata.hasPendingWrites && journey) cb(normalizeSaved(journey))
         },
         () => {
           // Offline or signed out: the next save or reload catches up.
@@ -160,21 +173,24 @@ export function createFirebaseBackend(): Backend {
  * the new profile fields. Then saves go on without them (friends just don't
  * see era strips yet), rather than failing.
  */
-let oldRules = false
-async function withOldRules<T extends Profile | null>(profile: T, write: (p: T) => Promise<unknown>) {
-  const strip = (p: T): T => {
+/** Until when saves leave the journey fields out; after that the full save is tried again, in case the rules were deployed. */
+let oldRulesUntil = 0
+const OLD_RULES_RETRY = 10 * 60 * 1000
+async function withOldRules<P extends Profile | null, R>(profile: P, write: (p: P) => Promise<R>): Promise<R> {
+  const strip = (p: P): P => {
     if (!p) return p
     const copy = { ...p } as Profile
     for (const key of JOURNEY_FIELDS) delete copy[key]
-    return copy as T
+    return copy as P
   }
-  if (oldRules) return void (await write(strip(profile)))
+  if (Date.now() < oldRulesUntil) return write(strip(profile))
   try {
-    await write(profile)
+    return await write(profile)
   } catch (err) {
     if (!denied(err) || !profile || !JOURNEY_FIELDS.some((k) => k in profile)) throw err
-    await write(strip(profile))
-    oldRules = true
+    const result = await write(strip(profile))
+    oldRulesUntil = Date.now() + OLD_RULES_RETRY
+    return result
   }
 }
 
@@ -194,12 +210,19 @@ function toProfile(uid: string, d: Record<string, unknown>): Profile {
     answered: Number(d.answered ?? 0),
   }
   for (const key of ['best25', 'best50', 'best100'] as const) if (typeof d[key] === 'number') p[key] = d[key]
-  if (Array.isArray(d.eras)) p.eras = d.eras.map(Number)
+  if (Array.isArray(d.eras) && d.eras.every((n) => Number.isInteger(n) && n >= 0)) p.eras = d.eras.map(Number)
   if (typeof d.goalDay === 'string') {
     p.goalDay = d.goalDay
     p.dayStreak = Number(d.dayStreak ?? 0)
     p.freezes = Number(d.freezes ?? 0)
   }
-  if (Array.isArray(d.recent)) p.recent = d.recent as Profile['recent']
+  // Another client wrote these: keep only well-formed moments, so one bad entry can't break the circle.
+  if (Array.isArray(d.recent)) {
+    const recent = d.recent.filter(
+      (e): e is CircleEvent =>
+        !!e && typeof e === 'object' && typeof e.t === 'number' && ((e.k === 'learned' && typeof e.id === 'string') || (e.k === 'era' && Number.isInteger(e.e))),
+    )
+    if (recent.length) p.recent = recent
+  }
   return p
 }

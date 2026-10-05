@@ -24,16 +24,22 @@ export interface Backend {
   loadProfile(uid: string): Promise<Profile | null>
   /** Replaces the whole profile document. */
   saveProfile(profile: Profile): Promise<void>
-  /** Throws NoAccessError when the account isn't allowlisted. */
+  /**
+   * The account's journey progress, or, before its fresh start, the record from
+   * before the journey (it has no journey version, see needsFreshStart).
+   * Throws NoAccessError when the account isn't allowlisted.
+   */
   loadProgress(uid: string): Promise<SavedProgress>
-  /** Saves progress changes and, when given, the updated leaderboard profile, together. */
+  /** Saves journey progress changes and, when given, the updated leaderboard profile, together. */
   saveProgress(uid: string, patch: ProgressPatch, profile: Profile | null): Promise<void>
   /**
-   * The journey's fresh start: replaces the whole progress record, keeping the
-   * old one as a backup inside it, and the profile, together.
+   * The journey's fresh start. The journey is kept apart from the old record,
+   * which stays untouched as the backup (and is all an old version of the app,
+   * left open in a tab, can still write to). Checked on the server: if another
+   * device already started the journey, its progress is returned instead.
    */
-  startFresh(uid: string, next: SavedProgress, backup: SavedProgress, profile: Profile | null): Promise<void>
-  /** Calls back with the stored progress whenever it changes (from any device). Returns an unsubscribe. */
+  startFresh(uid: string, next: SavedProgress, profile: Profile | null): Promise<SavedProgress>
+  /** Calls back with the stored journey whenever it changes (from any device). Returns an unsubscribe. */
   watchProgress(uid: string, cb: (saved: SavedProgress) => void): () => void
   listProfiles(): Promise<Profile[]>
 

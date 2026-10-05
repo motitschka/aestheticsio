@@ -110,6 +110,8 @@ function Choose({ a, entry, state, onPick }: { a: Aesthetic; entry: Entry | unde
 interface QueueItem {
   step: LessonStep
   retry: boolean
+  /** Asked again because an image it needed didn't load */
+  skipped?: boolean
 }
 
 function Steps({ a, all, byId, format, onDone, onAsking }: {
@@ -138,6 +140,18 @@ function Steps({ a, all, byId, format, onDone, onAsking }: {
       window.scrollTo({ top: 0 })
     }
   }, [index, queue.length, mistakes, onDone])
+
+  // A check whose image didn't load is asked again at the end, with other images,
+  // so a lesson is never learned without its checks. Once is enough: a second miss
+  // of the network just moves on.
+  const skip = () => {
+    if (current?.step.type !== 'question' || current.skipped) return next()
+    const again: QueueItem = { step: { type: 'question', question: rebuildLessonQuestion(current.step.question, all) }, retry: current.retry, skipped: true }
+    // Not next(): it would still see the queue without the check just added.
+    setQueue((items) => [...items, again])
+    setIndex(index + 1)
+    window.scrollTo({ top: 0 })
+  }
 
   const answer = (q: Question, correct: boolean) => {
     if (correct) return
@@ -168,7 +182,7 @@ function Steps({ a, all, byId, format, onDone, onAsking }: {
           question={current.step.question}
           onAnswer={(correct) => answer((current.step as { question: Question }).question, correct)}
           onNext={next}
-          onSkip={next}
+          onSkip={skip}
           nextLabel="Continue"
         />
       )}

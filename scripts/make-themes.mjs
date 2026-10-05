@@ -2,6 +2,7 @@
 // learning its lesson. Colours are read from the aesthetic's Pinterest pins
 // (pinterest/<Aesthetic>/); everything else comes from theme-designs.mjs.
 // Run after changing pins or designs:  npm run make-pins && npm run make-themes
+import { createHash } from 'node:crypto'
 import { readFile, writeFile } from 'node:fs/promises'
 import sharp from 'sharp'
 import { kmeans, rgbToOklab, themeColours } from './colour.mjs'
@@ -74,9 +75,30 @@ for (const [i, a] of data.items.entries()) {
   process.stdout.write(`\r  ${i + 1}/${data.items.length}`)
 }
 
+// Published pins that repeat one already published (the same file on two boards, or
+// twice on one): lesson checks leave them out, so no check shows one picture twice.
+const seen = new Map()
+let repeats = 0
+for (const t of Object.values(out)) {
+  for (let n = 1; n <= t.pins; n++) {
+    let hash
+    try {
+      hash = createHash('md5').update(await readFile(new URL(`../public/pins/${t.id}/${String(n).padStart(2, '0')}.webp`, import.meta.url))).digest('hex')
+    } catch {
+      continue
+    }
+    if (seen.has(hash)) {
+      t.repeats = [...(t.repeats ?? []), n]
+      repeats++
+      console.log(`  pin ${t.id}/${n} repeats ${seen.get(hash)}`)
+    } else seen.set(hash, `${t.id}/${n}`)
+  }
+}
+
 await writeFile(new URL('../data/themes.json', import.meta.url), JSON.stringify(out))
 console.log(`\nwrote data/themes.json: ${Object.keys(out).length} themes (${Object.values(out).filter((t) => t.dark).length} dark)`)
 if (problems.length) console.log(`skipped: ${problems.join('; ')}`)
+if (repeats) console.log(`${repeats} repeated pins left out of lesson checks`)
 if (failures.length) {
   console.error(`contrast failures:\n  ${failures.join('\n  ')}`)
   process.exit(1)

@@ -52,7 +52,14 @@ service cloud.firestore {
         && d.eras[0] >= 0 && d.eras[1] >= 0 && d.eras[2] >= 0 && d.eras[3] >= 0
         && d.eras[4] >= 0 && d.eras[5] >= 0 && d.eras[6] >= 0 && d.eras[7] >= 0
         && d.eras[0] <= 60 && d.eras[1] <= 60 && d.eras[2] <= 60 && d.eras[3] <= 60
-        && d.eras[4] <= 60 && d.eras[5] <= 60 && d.eras[6] <= 60 && d.eras[7] <= 60);
+        && d.eras[4] <= 60 && d.eras[5] <= 60 && d.eras[6] <= 60 && d.eras[7] <= 60
+        && learnedInEras(d.eras) <= 200
+        // learned counts 1 and mastered 2 in lessonPoints, so it lies between learned and twice that
+        && learnedInEras(d.eras) <= d.lessonPoints && d.lessonPoints <= 2 * learnedInEras(d.eras));
+    }
+
+    function learnedInEras(e) {
+      return e[0] + e[1] + e[2] + e[3] + e[4] + e[5] + e[6] + e[7];
     }
 
     function validProfile(d) {

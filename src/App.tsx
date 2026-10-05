@@ -83,6 +83,21 @@ export default function App() {
 
   useEffect(() => backend?.onAuthChange(setUser), [backend])
 
+  // "Today" moves on while the app sits open or in the background: the daily goal reads it.
+  useEffect(() => {
+    const tick = () => {
+      if (document.visibilityState === 'visible') setNow(Date.now())
+    }
+    const timer = window.setInterval(tick, 60_000)
+    document.addEventListener('visibilitychange', tick)
+    window.addEventListener('focus', tick)
+    return () => {
+      window.clearInterval(timer)
+      document.removeEventListener('visibilitychange', tick)
+      window.removeEventListener('focus', tick)
+    }
+  }, [])
+
   const account = backend ? user : null
 
   useEffect(() => {
@@ -94,12 +109,11 @@ export default function App() {
         const [isAdmin, remote] = await Promise.all([backend.isAdmin(), backend.loadProgress(user.uid)])
         let progress = remote
         const p = await backend.loadProfile(user.uid)
-        // The journey through time starts everyone fresh, once; the old record is kept as a backup.
+        // The journey through time starts everyone fresh, once; the old record stays as the backup.
         if (needsFreshStart(remote)) {
-          const had = hasProgress(remote)
-          progress = freshStart(had)
-          if (had) await backend.startFresh(user.uid, progress, remote, p ? profileFrom(p, progress, allRef.current) : null)
-          else await backend.saveProgress(user.uid, { stats: progress.stats }, null)
+          const next = freshStart(hasProgress(remote))
+          const identityOnly = p ? { uid: user.uid, nickname: p.nickname, avatar: p.avatar } : null
+          progress = await backend.startFresh(user.uid, next, identityOnly ? profileFrom(identityOnly, next, allRef.current) : null)
         }
         const guestProgress = loadGuestProgress()
         const carried = hasGuestProgress(guestProgress)
@@ -108,7 +122,7 @@ export default function App() {
           await backend.saveProgress(user.uid, progress, null)
           clearGuestProgress()
         }
-        if (p && carried) await backend.saveProfile(profileFrom(p, progress, allRef.current))
+        if (p && carried) await backend.saveProfile(profileFrom({ uid: user.uid, nickname: p.nickname, avatar: p.avatar }, progress, allRef.current))
         if (cancelled) return
         saveGuestChoice(false)
         setGuest(false)
@@ -128,13 +142,19 @@ export default function App() {
   }, [backend, user])
 
   // Each aesthetic with its published pins: lessons check with images the lesson hasn't shown.
+  // Not the pins of the theme being worn (they're on screen every day), nor repeated ones.
+  const wornTheme = saved.stats.theme ?? ''
   const aesthetics = useMemo(
     () =>
       (data?.items ?? []).map((a) => {
         const t = themes?.[a.id]
-        return t?.pins ? { ...a, pins: Array.from({ length: t.pins }, (_, i) => pinUrl(t, i + 1)) } : a
+        if (!t?.pins || a.id === wornTheme) return a
+        const pins = Array.from({ length: t.pins }, (_, i) => i + 1)
+          .filter((n) => !t.repeats?.includes(n))
+          .map((n) => pinUrl(t, n))
+        return { ...a, pins }
       }),
-    [data, themes],
+    [data, themes, wornTheme],
   )
   const byId = useMemo(() => new Map(aesthetics.map((a) => [a.id, a])), [aesthetics])
   useEffect(() => {

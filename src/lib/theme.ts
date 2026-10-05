@@ -40,6 +40,8 @@ export interface Theme {
   caps: boolean
   /** number of published pins in public/pins/<id>/ */
   pins: number
+  /** pins (1-based) that repeat an earlier published pin; lesson checks leave them out */
+  repeats?: number[]
   colours: ThemeColours
   swatches: string[]
   glow: string

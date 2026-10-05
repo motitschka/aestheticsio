@@ -29,6 +29,8 @@ interface Props {
 
 interface Result {
   correct: boolean
+  /** false when an image the question needs had failed: shown, but not counted */
+  scored: boolean
   picked?: string
   order?: string[]
 }
@@ -95,14 +97,16 @@ export function QuestionView({ question: q, onAnswer, onNext, autoAdvanceMs = 90
   const [result, setResult] = useState<Result | null>(null)
   // An image the question needs didn't load: it can be skipped, and an answer doesn't count.
   const [broken, setBroken] = useState(false)
-  const unscored = broken && !!onSkip
+  // Settled when the answer is given: an image failing afterwards changes nothing.
+  const unscored = result ? !result.scored : broken && !!onSkip
   const nextBtn = useRef<HTMLButtonElement>(null)
   const onImageFail = useCallback(() => setBroken(true), [])
 
-  const finish = (r: Result) => {
+  const finish = (r: Omit<Result, 'scored'>) => {
     if (result) return
-    setResult(r)
-    if (!unscored) onAnswer(r.correct)
+    const scored = !(broken && onSkip)
+    setResult({ ...r, scored })
+    if (scored) onAnswer(r.correct)
   }
   const proceed = unscored ? onSkip! : onNext
 

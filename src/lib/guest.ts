@@ -1,27 +1,30 @@
 import type { SavedProgress } from '../types'
-import { emptyStats, freshStart, hasProgress, needsFreshStart, normalizeSaved } from './progress'
+import { freshStart, hasProgress, needsFreshStart, normalizeSaved } from './progress'
 import { storageKey } from './storage'
 
 // Guest play keeps progress in this browser only. When a guest signs in,
 // their progress is merged into the account and cleared here.
-const PROGRESS_KEY = storageKey('guest-progress')
+const PROGRESS_KEY = storageKey('guest-journey')
 const GUEST_KEY = storageKey('guest')
-/** A guest's progress from before the journey through time, kept when it was reset. */
-const BACKUP_KEY = storageKey('guest-progress-v1-backup')
+/**
+ * Progress from before the journey through time. It's kept as the backup and
+ * never written again (except by an old version of the app left open in a tab).
+ */
+export const LEGACY_KEY = storageKey('guest-progress')
 
-/** This browser's progress. The first load after the journey arrived starts it fresh, keeping a backup. */
+/** This browser's journey. The first load after the journey arrived starts it fresh. */
 export function loadGuestProgress(): SavedProgress {
   try {
     const raw = localStorage.getItem(PROGRESS_KEY)
-    const saved = normalizeSaved(JSON.parse(raw ?? '{}'))
-    if (!needsFreshStart(saved)) return saved
-    const had = hasProgress(saved)
-    if (had && raw && !localStorage.getItem(BACKUP_KEY)) localStorage.setItem(BACKUP_KEY, JSON.stringify({ ...JSON.parse(raw), at: Date.now() }))
+    if (raw) return normalizeSaved(JSON.parse(raw))
+    const legacy = normalizeSaved(JSON.parse(localStorage.getItem(LEGACY_KEY) ?? '{}'))
+    if (!needsFreshStart(legacy)) return legacy
+    const had = hasProgress(legacy)
     const next = freshStart(had)
     if (had) localStorage.setItem(PROGRESS_KEY, JSON.stringify(next))
     return next
   } catch {
-    return { items: {}, stats: emptyStats() }
+    return freshStart(false)
   }
 }
 
@@ -35,9 +38,10 @@ export function saveGuestProgress(progress: SavedProgress) {
   }
 }
 
+/** After it's merged into an account: an empty journey, so the backup isn't mistaken for new progress. */
 export function clearGuestProgress() {
   try {
-    localStorage.removeItem(PROGRESS_KEY)
+    localStorage.setItem(PROGRESS_KEY, JSON.stringify(freshStart(false)))
   } catch {
     // ignore
   }

@@ -62,7 +62,12 @@ export function createDemoBackend(): Backend {
   const listeners = new Set<(u: AppUser | null) => void>()
   const current = () => (read('signedIn', false) ? ME : null)
   const emit = () => listeners.forEach((cb) => cb(current()))
-  const loadSaved = (uid: string) => normalizeSaved(read<unknown>(`progress:${uid}`, {}))
+  // The journey is kept apart from the record from before it (which stays as the backup).
+  const loadJourney = (uid: string) => {
+    const journey = read<unknown>(`journey:${uid}`, null)
+    return journey ? normalizeSaved(journey) : null
+  }
+  const loadSaved = (uid: string) => loadJourney(uid) ?? normalizeSaved(read<unknown>(`progress:${uid}`, {}))
 
   return {
     onAuthChange(cb) {
@@ -92,12 +97,15 @@ export function createDemoBackend(): Backend {
     async saveProgress(uid, patch, profile) {
       const saved = loadSaved(uid)
       const next: SavedProgress = { items: { ...saved.items, ...patch.items }, stats: patch.stats ?? saved.stats }
-      write(`progress:${uid}`, next)
+      write(`journey:${uid}`, next)
       if (profile) write(`profile:${uid}`, profile)
     },
-    async startFresh(uid, next, backup, profile) {
-      write(`progress:${uid}`, { ...next, backupV1: { ...backup, at: Date.now() } })
+    async startFresh(uid, next, profile) {
+      const started = loadJourney(uid)
+      if (started) return started
+      write(`journey:${uid}`, next)
       if (profile) write(`profile:${uid}`, profile)
+      return next
     },
     watchProgress() {
       // One browser: nothing else writes.
