@@ -1,0 +1,51 @@
+name: Fetch wiki articles
+
+# Downloads every aesthetic's full Aesthetics Wiki article into public/wiki/
+# (npm run fetch-wiki) and commits it to the branch it ran on. Run it from the
+# Actions tab to refresh the articles. On the preview branch it also runs when
+# the fetcher changes, and rebuilds the site so /next/ shows the result.
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [pin-refresh-2kmumy]
+    paths: [scripts/fetch-wiki.mjs, scripts/wiki-html.mjs, .github/workflows/wiki.yml]
+
+permissions:
+  contents: write
+  actions: write
+
+concurrency:
+  group: wiki-${{ github.ref_name }}
+  cancel-in-progress: true
+
+jobs:
+  fetch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.ref_name }}
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npm run fetch-wiki
+        env:
+          SAMPLE: ${{ github.event_name == 'push' && '2' || '0' }}
+      - name: Commit the articles
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add public/wiki
+          if git diff --cached --quiet; then echo "No changes"; exit 0; fi
+          git commit -m "Refresh wiki articles from the Aesthetics Wiki"
+          git pull --rebase origin "$GITHUB_REF_NAME"
+          git push origin "HEAD:$GITHUB_REF_NAME"
+          echo "pushed=true" >> "$GITHUB_ENV"
+      # A push made with the workflow's token doesn't start other workflows.
+      - if: env.pushed == 'true' && (github.ref_name == 'main' || github.ref_name == (vars.PREVIEW_BRANCH || 'pin-refresh-2kmumy'))
+        run: gh workflow run deploy.yml --repo "$GITHUB_REPOSITORY" --ref main
+        env:
+          GH_TOKEN: ${{ github.token }}
