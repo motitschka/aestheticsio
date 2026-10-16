@@ -163,6 +163,7 @@
 }
 
 .wiki-mosaic-tile {
+  position: relative;
   min-width: 0;
   min-height: 0;
   padding: 0;
@@ -181,7 +182,10 @@
   display: none;
 }
 
+/* the pictures fill their tiles and never push the mosaic open */
 .wiki-mosaic :is(.photo, .wiki-mosaic-pin) {
+  position: absolute;
+  inset: 0;
   display: block;
   width: 100%;
   height: 100%;
@@ -209,7 +213,7 @@
 
   .wiki-mosaic {
     height: auto;
-    min-height: 380px;
+    min-height: clamp(380px, 26vw, 640px);
     grid-template-columns: 2fr 1fr 1fr;
   }
 
