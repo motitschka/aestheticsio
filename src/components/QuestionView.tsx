@@ -5,6 +5,7 @@ import { shuffle } from '../lib/random'
 import { BLANK } from '../lib/text'
 import type { Aesthetic } from '../types'
 import { Photo } from './Photo'
+import { wikiHref } from '../lib/wiki'
 
 interface Props {
   question: Question
@@ -175,9 +176,15 @@ export function QuestionView({ question: q, onAnswer, onNext, autoAdvanceMs = 90
                   Take the lesson on {target.name}
                 </button>
               )}
-              <a className="link" href={target.wiki} target="_blank" rel="noreferrer">
-                Aesthetics Wiki ↗
-              </a>
+              {onLesson ? (
+                <a className="link" href={wikiHref(target.id)}>
+                  {target.name} in the wiki
+                </a>
+              ) : (
+                <a className="link" href={target.wiki} target="_blank" rel="noreferrer">
+                  Aesthetics Wiki ↗
+                </a>
+              )}
             </div>
           )}
           <button ref={nextBtn} className="btn btn-primary" onClick={proceed}>

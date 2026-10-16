@@ -21,6 +21,15 @@ on the Aesthetics Wiki.
   - **Seen** = finished, **learned** = every check right in one go (unlocks the
     theme), **mastered** = perfect again at least 30 days later. Learned and
     mastered are never lost; a mistake only restarts the month before mastery.
+- **Wiki:** a page for every aesthetic (the **Wiki** tab, or `#/wiki/<id>`), each
+  always dressed in that aesthetic's own theme, locked or not, never another one.
+  It holds the full Aesthetics Wiki article (overview, history, visuals, fashion,
+  music, galleries…, with links between aesthetics staying in the app), the facts
+  box, your lesson, the theme's pinboard, related aesthetics, the rest of its era
+  and the theme itself (palette, type, shapes). On a computer it uses the whole
+  width: contents, article and facts side by side, and on very wide screens each
+  section's pictures beside its text. On a phone it is one column like every other
+  screen. Pictures enlarge on tap; wiki videos open on the wiki.
 - **Daily goal:** one lesson a day builds a day streak. A second lesson in a day
   banks a freeze (up to two), and a freeze covers a day you miss.
 - **Practice modes** (rounds of 10): image → name, name → image, description → name,
@@ -128,6 +137,7 @@ then the app keeps working with the old rules and just leaves out the new fields
 | `npm test` | Quiz, progress and journey logic tests |
 | `npm run test:rules` | Firestore security rules tests (needs Java 21+) |
 | `npm run fetch-data` | Re-download the aesthetics into `data/aesthetics.json`; commit and push to publish |
+| `npm run fetch-wiki` | Re-download every aesthetic's full wiki article into `public/wiki/<id>.json` (text and image addresses; images stay on Fandom). The **Fetch wiki articles** workflow (Actions tab → Run workflow) does this on GitHub and commits the result |
 | `npm run make-pins` | Resize the Pinterest boards in `pinterest/<Aesthetic name>/` (local, not committed) into `public/pins/<id>/` |
 | `npm run make-themes` | Rebuild `data/themes.json`: colours from each board's pins, plus the hand-picked fonts, shapes, layout, icons, motion and pattern in `scripts/theme-designs.mjs` |
 | `npm run make-icon` | Redraw the app icon (`scripts/make-icon.cjs`) into `public/icons/`, `public/apple-touch-icon.png` and `public/favicon.svg` |

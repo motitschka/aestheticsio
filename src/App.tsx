@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { createBackend, isDemo, NoAccessError, type Backend } from './backend'
 import type { ProgressPatch } from './backend/types'
 import { Backdrop } from './components/Backdrop'
@@ -11,6 +11,7 @@ import { Play } from './components/Play'
 import { ProfileEditor } from './components/ProfileEditor'
 import { ProgressView } from './components/ProgressView'
 import { ThemePicker } from './components/ThemePicker'
+import { WikiIndex, WikiMissing, WikiPage, WikiWaiting } from './components/Wiki'
 import { loadAestheticsData, loadThemes } from './data'
 import { formatTime } from './lib/format'
 import { clearGuestProgress, hasGuestProgress, loadGuestChoice, loadGuestProgress, saveGuestChoice, saveGuestProgress } from './lib/guest'
@@ -38,11 +39,12 @@ import {
 import type { Question } from './lib/questions'
 import { START_AS_GUEST_EVENT } from './lib/intro-events'
 import { applyTheme, pinUrl, themeUnlocked, type Themes } from './lib/theme'
+import { parseRoute, wikiHref } from './lib/wiki'
 import { ThemeContext } from './lib/theme-context'
 import { Icon, type IconName } from './components/Icon'
 import type { Aesthetic, AestheticsData, AppUser, CircleEvent, PracticeMode, SavedProgress } from './types'
 
-type Tab = 'play' | 'progress' | 'ranks' | 'me'
+type Tab = 'play' | 'progress' | 'wiki' | 'ranks' | 'me'
 type Status = 'loading' | 'noAccess' | 'error' | 'ready'
 type Identity = { nickname: string; avatar: string }
 
@@ -53,6 +55,7 @@ export default function App() {
   const [data, setData] = useState<AestheticsData | null>(null)
   const [dataFailed, setDataFailed] = useState(false)
   const [themes, setThemes] = useState<Themes | null>(null)
+  const [themesFailed, setThemesFailed] = useState(false)
   // undefined while loading; null when Firebase isn't configured (guest-only site)
   const [backend, setBackend] = useState<Backend | null | undefined>(undefined)
   const [user, setUser] = useState<AppUser | null | undefined>(undefined)
@@ -70,6 +73,8 @@ export default function App() {
   const [now, setNow] = useState(Date.now)
 
   const [tab, setTab] = useState<Tab>('play')
+  // The wiki lives at #/wiki and #/wiki/<id>, so pages can be shared and the back button works.
+  const [route, setRoute] = useState(() => parseRoute(location.hash))
   const [inRound, setInRound] = useState(false)
   const [lessonId, setLessonId] = useState<string | null>(null)
   const [editing, setEditing] = useState(false)
@@ -78,10 +83,24 @@ export default function App() {
   useEffect(() => {
     loadAestheticsData().then(setData, () => setDataFailed(true))
     createBackend().then(setBackend, () => setBackend(null))
-    loadThemes().then(setThemes, () => setThemes(null))
+    loadThemes().then(setThemes, () => setThemesFailed(true))
   }, [])
 
   useEffect(() => backend?.onAuthChange(setUser), [backend])
+
+  useEffect(() => {
+    const follow = () => setRoute(parseRoute(location.hash))
+    window.addEventListener('hashchange', follow)
+    window.addEventListener('popstate', follow)
+    return () => {
+      window.removeEventListener('hashchange', follow)
+      window.removeEventListener('popstate', follow)
+    }
+  }, [])
+  const routeKey = route ? (route.id ?? '') : null
+  useEffect(() => {
+    if (routeKey !== null) window.scrollTo({ top: 0 })
+  }, [routeKey])
 
   // "Today" moves on while the app sits open or in the background: the daily goal reads it.
   useEffect(() => {
@@ -178,7 +197,12 @@ export default function App() {
   // The chosen theme, if it's unlocked, dresses the whole app.
   const themeId = saved.stats.theme ?? ''
   const theme = themes && themeId && themeUnlocked(saved.items[themeId]) ? themes[themeId] : null
-  useEffect(() => applyTheme(theme ?? null), [theme])
+  // A wiki page always wears its own aesthetic's theme, unlocked or not (a lesson opened from it doesn't).
+  const article = route?.id && !lessonId ? byId.get(route.id) : undefined
+  const articleTheme = article && themes ? (themes[article.id] ?? null) : null
+  const shown = articleTheme ?? (article ? null : theme)
+  // Before paint, so a page never flashes in another theme.
+  useLayoutEffect(() => applyTheme(shown ?? null), [shown])
 
   /** Applies a change locally and saves it (account or this browser). */
   const commit = useCallback(
@@ -299,6 +323,7 @@ export default function App() {
   const openLesson = useCallback((a: { id: string }) => {
     setNow(Date.now())
     setLessonId(a.id)
+    window.scrollTo({ top: 0 })
   }, [])
 
   const signIn = async () => {
@@ -308,6 +333,20 @@ export default function App() {
     } catch {
       setSignInError('Sign-in failed. Please try again.')
     }
+  }
+
+  const openTab = (t: Tab) => {
+    if (t === 'wiki') {
+      if (location.hash !== wikiHref()) location.hash = wikiHref()
+      return
+    }
+    // Leaving the wiki: drop its address (back comes back to it).
+    if (route) {
+      history.pushState(null, '', location.pathname + location.search)
+      setRoute(null)
+      window.scrollTo({ top: 0 })
+    }
+    setTab(t)
   }
 
   const resetView = () => {
@@ -407,12 +446,14 @@ export default function App() {
   }
 
   const lesson = lessonId ? byId.get(lessonId) : undefined
-  const showTabs = !inRound && !lesson
+  const current: Tab = route ? 'wiki' : tab
+  const showTabs = !lesson && (!inRound || !!route)
+  const wide = !!route && !lesson
 
   return (
-    <ThemeContext.Provider value={theme ?? null}>
-    <main className={`app ${showTabs ? 'has-tabs' : 'in-round'}`}>
-      {theme && <Backdrop theme={theme} />}
+    <ThemeContext.Provider value={shown ?? null}>
+    <main className={`app ${showTabs ? 'has-tabs' : 'in-round'} ${wide ? 'is-wide' : ''}`}>
+      {shown && <Backdrop theme={shown} />}
       {lesson && (
         <Lesson
           key={lesson.id}
@@ -434,10 +475,10 @@ export default function App() {
 
       {/* Kept mounted under a lesson so a practice round can carry on afterwards. */}
       <div hidden={!!lesson}>
-        {isDemo && showTabs && <p className="demo-banner">Demo mode: data stays in this browser</p>}
+        {isDemo && showTabs && !route && <p className="demo-banner">Demo mode: data stays in this browser</p>}
         {saveFailed && <p className="notice notice-top">Couldn't save your last answer. Check your connection.</p>}
 
-        <div hidden={tab !== 'play'}>
+        <div hidden={current !== 'play'}>
           <Play
             all={aesthetics}
             byId={byId}
@@ -452,10 +493,30 @@ export default function App() {
             onDismissNote={dismissJourneyNote}
           />
         </div>
-        {tab === 'progress' && <ProgressView aesthetics={aesthetics} items={saved.items} now={now} onLesson={openLesson} />}
-        {tab === 'ranks' &&
+        {current === 'wiki' &&
+          (!route?.id ? (
+            <WikiIndex aesthetics={aesthetics} themes={themes} />
+          ) : !byId.has(route.id) ? (
+            <WikiMissing />
+          ) : !articleTheme || !article ? (
+            <WikiWaiting failed={themesFailed} />
+          ) : (
+            <WikiPage
+              key={article.id}
+              a={article}
+              theme={articleTheme}
+              all={aesthetics}
+              entry={saved.items[article.id]}
+              now={now}
+              themeInUse={themeId === article.id && !!theme}
+              onUseTheme={pickTheme}
+              onLesson={openLesson}
+            />
+          ))}
+        {current === 'progress' && <ProgressView aesthetics={aesthetics} items={saved.items} now={now} onLesson={openLesson} />}
+        {current === 'ranks' &&
           (profile ? <Leaderboard all={aesthetics} byId={byId} me={profile.uid} load={listProfiles} /> : <LeaderboardSignIn onSignIn={signIn} error={signInError} />)}
-        {tab === 'me' && (
+        {current === 'me' && (
           <Me
             account={
               account && profile && backend
@@ -479,10 +540,11 @@ export default function App() {
 
       {showTabs && (
         <nav className="tabbar">
-          <TabButton id="play" label="Play" tab={tab} onTab={setTab} icon="play" />
-          <TabButton id="progress" label="Lessons" tab={tab} onTab={setTab} icon="lessons" />
-          {backend && <TabButton id="ranks" label="Circle" tab={tab} onTab={setTab} icon="ranks" />}
-          <TabButton id="me" label="Me" tab={tab} onTab={setTab} icon="me" />
+          <TabButton id="play" label="Play" tab={current} onTab={openTab} icon="play" />
+          <TabButton id="progress" label="Lessons" tab={current} onTab={openTab} icon="lessons" />
+          <TabButton id="wiki" label="Wiki" tab={current} onTab={openTab} icon="wiki" />
+          {backend && <TabButton id="ranks" label="Circle" tab={current} onTab={openTab} icon="ranks" />}
+          <TabButton id="me" label="Me" tab={current} onTab={openTab} icon="me" />
         </nav>
       )}
     </main>

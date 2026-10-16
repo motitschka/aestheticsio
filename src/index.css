@@ -1650,7 +1650,7 @@ button.row {
 }
 
 /* Text that sits straight on the collage gets a soft halo in the background colour. */
-:root[data-theme] :is(.page > p, .page > h1, .page > h2, .eyebrow, .display, .title, .section-title, .era-heading, .era-label, .prompt, .muted:not(.card *, .list-item *, .mode-row *, .feedback-panel *)) {
+:root[data-theme] :is(.page > p, .page > h1, .page > h2, .eyebrow, .display, .title, .section-title, .era-heading, .era-label, .prompt, .muted:not(.card *, .list-item *, .mode-row *, .feedback-panel *, .wiki *, .wiki-card *)) {
   text-shadow:
     0 0 1px var(--bg),
     0 0 2px var(--bg),

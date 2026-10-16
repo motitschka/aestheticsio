@@ -4,6 +4,7 @@ import { SIZE } from '../lib/images'
 import { LESSON_LABEL, MASTERY_WAIT, type LessonState } from '../lib/progress'
 import { lessonSteps, rebuildLessonQuestion, type InfoCard, type LessonFormat, type LessonStep, type Question } from '../lib/questions'
 import type { Theme } from '../lib/theme'
+import { wikiHref } from '../lib/wiki'
 import type { Aesthetic, Entry } from '../types'
 import { Avatar } from './Avatar'
 import { Photo } from './Photo'
@@ -58,7 +59,7 @@ export function Lesson({ aesthetic: a, all, byId, entry, state, onFinish, theme,
         <span className="lesson-title">{asking && phase.k === 'steps' ? `Check · ${ERAS[eraOf(a)].label}` : a.name}</span>
       </div>
 
-      {phase.k === 'choose' && <Choose a={a} entry={entry} state={state} onPick={(format) => setPhase({ k: 'steps', format })} />}
+      {phase.k === 'choose' && <Choose a={a} entry={entry} state={state} onPick={(format) => setPhase({ k: 'steps', format })} onWiki={onClose} />}
       {phase.k === 'steps' && (
         <Steps
           key={phase.format}
@@ -83,7 +84,7 @@ export function Lesson({ aesthetic: a, all, byId, entry, state, onFinish, theme,
   )
 }
 
-function Choose({ a, entry, state, onPick }: { a: Aesthetic; entry: Entry | undefined; state: LessonState; onPick(f: LessonFormat): void }) {
+function Choose({ a, entry, state, onPick, onWiki }: { a: Aesthetic; entry: Entry | undefined; state: LessonState; onPick(f: LessonFormat): void; onWiki(): void }) {
   const masterOn = entry?.la !== undefined ? new Date(entry.la + MASTERY_WAIT) : null
   return (
     <section className="page">
@@ -103,6 +104,10 @@ function Choose({ a, entry, state, onPick }: { a: Aesthetic; entry: Entry | unde
       <button className="btn btn-secondary btn-big" onClick={() => onPick('info')}>
         Info only
       </button>
+      {/* closes the lesson; the link then opens the page */}
+      <a className="btn btn-ghost" href={wikiHref(a.id)} onClick={onWiki}>
+        Read the wiki page
+      </a>
     </section>
   )
 }

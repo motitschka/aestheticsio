@@ -29,6 +29,7 @@ Every lesson, question and image comes from the Aesthetics Wiki itself (intro, i
 - A journey through time: eight eras (before 1900 to now), walked oldest first; finishing means every lesson learned.
 - Lessons per aesthetic (info cards, then checks against its close relatives; tiers seen, learned, mastered; learned is never lost), seven practice modes, a Mixed challenge (endless, 25, 50, 100) with badges, the circle (a feed of friends' moments, era progress, day streaks, best streaks), profiles with aesthetic avatars.
 - 174 themes, one per aesthetic, unlocked by learning its lesson; chosen under Me, applied app-wide.
+- A wiki page per aesthetic with its full Aesthetics Wiki article, always in that aesthetic's own theme (never the default or another theme); full width on a computer, one column on a phone.
 - Wiki text is CC BY-SA and must stay credited. Images are hotlinked from Fandom's server, never re-hosted.
 - The user's Pinterest boards (`pinterest/`, git-ignored at full size) are each theme's inspiration and imagery. Resized copies in `public/pins/` are published with the public site by the owner's choice: theme backgrounds, moodboard strips, framed decoration, and the unseen images that lesson checks ask about. Wiki photos teach (lesson galleries) and are used in practice.
 - Free tiers only: GitHub Pages, Firebase Spark.
@@ -43,6 +44,7 @@ Every lesson, question and image comes from the Aesthetics Wiki itself (intro, i
 ## Evidence on Hand
 
 - `data/aesthetics.json`: 174 aesthetics with names, wiki links, up to 10 image URLs, intro and infobox facts.
+- `public/wiki/<id>.json`: each aesthetic's full wiki article (sections, lists, tables, image addresses), from `npm run fetch-wiki`.
 - `data/themes.json`: generated themes. `pinterest/<Aesthetic>/`: 10 pins per aesthetic (full size, local); `public/pins/<id>/`: their published webp copies.
 - No testimonials, press or user numbers exist; do not invent any.
 
