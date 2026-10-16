@@ -19,6 +19,8 @@ const html = `<div class="mw-parser-output"><aside class="portable-infobox"><h2>
 <div class="wikia-gallery-item"><div class="thumb"><div class="gallery-image-wrapper"><a href="https://static.wikia.nocookie.net/aesthetics/images/a/aa/One.png/revision/latest?cb=2" class="image lightbox"><img src="data:," data-src="https://static.wikia.nocookie.net/aesthetics/images/a/aa/One.png/revision/latest/scale-to-width-down/185?cb=2" width="185" height="120"></a></div></div><div class="lightbox-caption">Bubbles &amp; fish</div></div>
 <div class="wikia-gallery-item"><div class="thumb"><div class="gallery-image-wrapper"><a href="https://static.wikia.nocookie.net/aesthetics/images/b/bb/Two.png/revision/latest?cb=3" class="image lightbox"><img src="data:," data-src="https://static.wikia.nocookie.net/aesthetics/images/b/bb/Two.png/revision/latest/scale-to-width-down/185?cb=3" width="185" height="185"></a></div></div><div class="lightbox-caption">An AI-generated mall</div></div>
 </div></div>
+<figure class="thumb tnone"><a href="/wiki/File:A_toy_phone" class="image"><img data-src="https://static.wikia.nocookie.net/aesthetics/images/e/ee/A_toy_phone/revision/latest/scale-to-width-down/180?cb=4" width="180" height="135"></a><figcaption class="thumbcaption"><div> <br>A toy phone<br></div></figcaption></figure>
+<div class="main-article">Main article: <a href="/wiki/Y2K_Futurism">Y2K Futurism</a></div>
 <div class="mw-heading mw-heading2"><h2 id="Music">Music</h2></div>
 <div class="embedvideo ev_center"><div class="embedvideowrap"><iframe src="//www.youtube-nocookie.com/embed/dQw4w9WgXcQ?autoplay=0"></iframe></div><div class="thumbcaption">A song</div></div>
 <table class="wikitable"><tbody><tr><th>Artist</th><th>Year</th></tr><tr><td><a href="/wiki/Some_Band">Some Band</a></td><td>2006</td></tr></tbody></table>
@@ -58,6 +60,15 @@ describe('wiki articles', () => {
     expect(g.t).toBe('gallery')
     expect(g.items).toHaveLength(1)
     expect(g.items[0].cap).toEqual(['Bubbles & fish'])
+  })
+
+  it('marks videos (files without a picture extension) with their wiki page, and drops "main article" notes', () => {
+    expect(a.sections[1].blocks).toHaveLength(2)
+    expect(a.sections[1].blocks[1]).toEqual({
+      t: 'img',
+      side: 'center',
+      img: { src: 'https://static.wikia.nocookie.net/aesthetics/images/e/ee/A_toy_phone/revision/latest?cb=4', w: 180, h: 135, v: 'https://aesthetics.fandom.com/wiki/File:A_toy_phone', cap: ['A toy phone'] },
+    })
   })
 
   it('nests lists, keeps outside links, turns videos into links and keeps tables', () => {

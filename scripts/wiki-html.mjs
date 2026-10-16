@@ -17,6 +17,8 @@ const SKIP = [
   '.portable-infobox', '.infobox', '.toc', '#toc', '.navbox', '.mw-references-wrap', '.references', '.reflist',
   '.mw-editsection', '.noprint', '.mbox', '.ambox', '.notice', '.hatnote', '.dablink', '.mw-empty-elt',
   '.printfooter', '.catlinks', '.reference', '.magnify', '.error', '.mw-cite-backlink', '.wds-dropdown', '.nomobile',
+  // "Main article: …" and "This article is about …" notes
+  '.main-article', '.about-template', '.rellink',
 ]
 
 const INLINE = new Set(['a', 'b', 'strong', 'i', 'em', 'span', 'u', 's', 'del', 'ins', 'small', 'big', 'sub', 'sup', 'code', 'kbd', 'abbr', 'cite', 'q', 'font', 'mark', 'time', 'bdi', 'tt', 'var', 'br', 'img', 'wbr'])
@@ -94,14 +96,15 @@ export function tidy(list) {
     else if (isBr(x) && (out.length === 0 || isBr(last))) continue
     else out.push(typeof x === 'string' ? x.replace(/ {2,}/g, ' ') : x)
   }
-  while (out.length && isBr(out[out.length - 1])) out.pop()
   // trim around the edges and line breaks
   for (let i = 0; i < out.length; i++) {
     if (typeof out[i] !== 'string') continue
     if (i === 0 || isBr(out[i - 1])) out[i] = out[i].replace(/^\s+/, '')
     if (i === out.length - 1 || isBr(out[i + 1])) out[i] = out[i].replace(/\s+$/, '')
   }
-  return out.filter((x) => x !== '')
+  // no line breaks at the ends or twice in a row
+  const kept = out.filter((x) => x !== '')
+  return kept.filter((x, i) => !isBr(x) || (i > 0 && i < kept.length - 1 && !isBr(kept[i - 1])))
 }
 
 const tidyInner = (c) => {
@@ -130,8 +133,14 @@ function imageOf(img) {
   const w = Number(img.getAttribute('width')) || undefined
   const h = Number(img.getAttribute('height')) || undefined
   if (w && w < 48) return null
-  return { src, ...(w && h ? { w, h } : {}) }
+  // A file without a picture's extension is a video; the address is its still.
+  const file = decodeURIComponent(src.match(/\/images\/\w\/\w\w\/([^/]+)\/revision/)?.[1] ?? '')
+  const video = file && !PICTURE.test(file) ? { v: `${WIKI}File:${encodeURIComponent(file).replace(/%2C/g, ',')}` } : {}
+  return { src, ...(w && h ? { w, h } : {}), ...video }
 }
+
+const PICTURE = /\.(jpe?g|png|gif|webp|avif|bmp|tiff?)$/i
+const WIKI = 'https://aesthetics.fandom.com/wiki/'
 
 const CAPTION = ['figcaption', '.thumbcaption', '.lightbox-caption', '.gallerytext', '.wikia-gallery-caption', '.caption', '.image-caption']
 

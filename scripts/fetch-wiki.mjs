@@ -78,7 +78,8 @@ const written = new Set()
 for (const p of pages) {
   const resolve = (title) => {
     const to = canonical.has(title) ? canonical.get(title) : title
-    if (!to) return null
+    // missing pages, and redirects to categories or files ("White" → Category:White), stay text
+    if (!to || /^(category|file|image|template|special|user|help):/i.test(to)) return null
     const id = idByTitle.get(to.toLowerCase())
     if (id === p.a.id) return null
     return id ? { id } : { href: wikiUrl(to) }
