@@ -6,7 +6,7 @@
  */
 
 .app.is-wide {
-  max-width: 2200px;
+  max-width: none;
 }
 
 @media (min-width: 900px) {
@@ -215,6 +215,13 @@
 
   .wiki-mosaic-tile:nth-child(n + 4) {
     display: block;
+  }
+}
+
+/* very wide screens: the lead keeps a reading width, the pictures take the rest */
+@media (min-width: 1700px) {
+  .wiki-hero {
+    grid-template-columns: minmax(0, 52rem) minmax(0, 1fr);
   }
 }
 
@@ -517,7 +524,7 @@ a.wiki-zoom {
 /* very wide screens: each section's pictures in a column beside its text */
 .wiki-split {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(300px, 0.72fr);
+  grid-template-columns: minmax(0, 46rem) minmax(300px, 1fr);
   gap: 36px;
   align-items: start;
 }
@@ -546,7 +553,7 @@ a.wiki-zoom {
 }
 
 .wiki-flow.is-columns {
-  columns: 2 28em;
+  columns: 26em;
   column-gap: 48px;
 }
 
@@ -582,6 +589,11 @@ a.wiki-zoom {
   background: var(--surface-2);
 }
 
+.wiki-figure.is-cell {
+  width: 160px;
+  margin: 0 0 6px;
+}
+
 .wiki-table caption {
   padding-bottom: 6px;
   color: var(--muted);
@@ -589,21 +601,13 @@ a.wiki-zoom {
 }
 
 .wiki-video {
-  display: flex;
-  flex-direction: column;
+  display: inline-flex;
   gap: 6px;
-  max-width: 420px;
+  max-width: 100%;
   margin: 0 0 16px;
   color: var(--text);
   font-weight: 600;
   text-decoration: none;
-}
-
-.wiki-video img {
-  width: 100%;
-  aspect-ratio: 16 / 9;
-  object-fit: cover;
-  border-radius: var(--radius-sm);
 }
 
 /* ---------- facts and lesson ---------- */
@@ -691,7 +695,7 @@ a.wiki-zoom {
 
 @media (min-width: 900px) {
   .wiki-pins {
-    columns: 6 180px;
+    columns: 200px;
     column-gap: 12px;
   }
 

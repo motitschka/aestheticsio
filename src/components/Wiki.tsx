@@ -1,4 +1,4 @@
-import { Fragment, useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import { ERAS, eraOf, journeyOrder } from '../lib/eras'
 import { SIZE, thumb } from '../lib/images'
@@ -125,6 +125,7 @@ export function WikiPage({ a, theme, all, entry, now, themeInUse, onUseTheme, on
   const [zoom, setZoom] = useState<Zoom | null>(null)
   const wide = useMedia('(min-width: 1700px)')
   const onZoom = useCallback((z: Zoom) => setZoom(z), [])
+  const closeZoom = useCallback(() => setZoom(null), [])
 
   useEffect(() => {
     let live = true
@@ -312,7 +313,7 @@ export function WikiPage({ a, theme, all, entry, now, themeInUse, onUseTheme, on
         </p>
       </footer>
 
-      {zoom && <Lightbox zoom={zoom} onClose={() => setZoom(null)} />}
+      {zoom && <Lightbox zoom={zoom} onClose={closeZoom} />}
     </article>
   )
 }
@@ -580,17 +581,17 @@ function BlockView({ b, onZoom, inRail }: { b: Block; onZoom(z: Zoom): void; inR
             <tbody>
               {b.rows.map((row, i) => (
                 <tr key={i}>
-                  {row.map((cell, j) =>
-                    cell.h ? (
-                      <th key={j}>
+                  {row.map((cell, j) => {
+                    const inner = (
+                      <>
+                        {cell.imgs?.map((img) => (
+                          <Figure key={img.src} img={img} side="cell" size={SIZE.medium} onZoom={onZoom} />
+                        ))}
                         <Inlines c={cell.c} />
-                      </th>
-                    ) : (
-                      <td key={j}>
-                        <Inlines c={cell.c} />
-                      </td>
-                    ),
-                  )}
+                      </>
+                    )
+                    return cell.h ? <th key={j}>{inner}</th> : <td key={j}>{inner}</td>
+                  })}
                 </tr>
               ))}
             </tbody>
@@ -600,12 +601,11 @@ function BlockView({ b, onZoom, inRail }: { b: Block; onZoom(z: Zoom): void; inR
     case 'video':
       return (
         <a className="wiki-video" href={b.href} target="_blank" rel="noreferrer">
-          {b.yt && <img src={`https://i.ytimg.com/vi/${b.yt}/mqdefault.jpg`} alt="" loading="lazy" decoding="async" />}
           <span>
             <span className="wiki-video-play" aria-hidden>
               ▶
             </span>{' '}
-            {b.cap ? plainText(b.cap) : b.yt ? 'Watch on YouTube' : 'Listen on Spotify'} ↗
+            {b.cap ? plainText(b.cap) : /youtube/.test(b.href) ? 'Watch on YouTube' : 'Listen on Spotify'} ↗
           </span>
         </a>
       )
@@ -648,7 +648,7 @@ function Inlines({ c }: { c: Inline[] }) {
   )
 }
 
-function Figure({ img, side, onZoom, size = 640 }: { img: WikiImage; side: 'right' | 'left' | 'center' | 'rail' | 'tile'; onZoom(z: Zoom): void; size?: number }) {
+function Figure({ img, side, onZoom, size = 640 }: { img: WikiImage; side: 'right' | 'left' | 'center' | 'rail' | 'tile' | 'cell'; onZoom(z: Zoom): void; size?: number }) {
   const [failed, setFailed] = useState(false)
   // A picture that won't load is left out; a video keeps its link.
   if (failed && !img.v) return null
@@ -698,18 +698,34 @@ function Gallery({ items, onZoom }: { items: WikiImage[]; onZoom(z: Zoom): void 
 }
 
 function Lightbox({ zoom, onClose }: { zoom: Zoom; onClose(): void }) {
+  // The control that opened it, taken before the close button grabs focus; focus goes back there.
+  const [opener] = useState(() => document.activeElement as HTMLElement | null)
+  const box = useRef<HTMLDivElement>(null)
+  const close = useRef(onClose)
   useEffect(() => {
-    const key = (e: KeyboardEvent) => e.key === 'Escape' && onClose()
+    close.current = onClose
+  })
+  useEffect(() => {
+    const key = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') close.current()
+      // Tab stays inside the picture
+      if (e.key === 'Tab' && box.current) {
+        const stops = [...box.current.querySelectorAll<HTMLElement>('a[href], button')]
+        const at = stops.indexOf(document.activeElement as HTMLElement)
+        if (!stops.length) return
+        e.preventDefault()
+        stops[(at + (e.shiftKey ? -1 : 1) + stops.length) % stops.length].focus()
+      }
+    }
     window.addEventListener('keydown', key)
-    const was = document.activeElement as HTMLElement | null
     return () => {
       window.removeEventListener('keydown', key)
-      was?.focus?.()
+      opener?.focus?.()
     }
-  }, [onClose])
+  }, [opener])
   // On the body: the page's sheets would otherwise hold it in place.
   return createPortal(
-    <div className="wiki-lightbox" role="dialog" aria-modal="true" aria-label="Picture" onClick={onClose}>
+    <div ref={box} className="wiki-lightbox" role="dialog" aria-modal="true" aria-label="Picture" onClick={onClose}>
       <figure onClick={(e) => e.stopPropagation()}>
         <img src={zoom.local ? zoom.src : thumb(zoom.src, 1600)} alt={zoom.cap ? plainText(zoom.cap) : ''} />
         {zoom.cap && (

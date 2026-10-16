@@ -76,7 +76,7 @@ describe('wiki articles', () => {
     expect(list.items[0].sub[0].items[0].c).toEqual(['Glossy buttons'])
     expect(list.items[1].c[0]).toEqual({ t: 'a', c: ['An outside site'], href: 'https://example.com/a' })
     const [video, table, quote] = a.sections[2].blocks
-    expect(video).toEqual({ t: 'video', yt: 'dQw4w9WgXcQ', href: 'https://www.youtube.com/watch?v=dQw4w9WgXcQ', cap: ['A song'] })
+    expect(video).toEqual({ t: 'video', href: 'https://www.youtube.com/watch?v=dQw4w9WgXcQ', cap: ['A song'] })
     expect(table.rows[0]).toEqual([{ h: 1, c: ['Artist'] }, { h: 1, c: ['Year'] }])
     expect(quote).toEqual({ t: 'quote', c: [{ t: 'p', c: ['Glossy everything.'] }] })
   })
@@ -86,5 +86,48 @@ describe('wiki articles', () => {
     const out = relink(a, (title) => (title === 'Y2K Futurism' ? { id: 'y2k-futurism' } : title === 'Glass' ? null : { href: 'https://aesthetics.fandom.com/wiki/' + title }))
     expect(out.lead[0].c).toContainEqual({ t: 'a', c: ['Y2K Futurism'], id: 'y2k-futurism' })
     expect(out.sections[0].blocks[0].img.cap).toEqual(["Windows Vista's ", 'glass'])
+  })
+
+  const pic = (name, w = 200) => `<a href="https://static.wikia.nocookie.net/aesthetics/images/1/11/${name}/revision/latest?cb=1" class="image"><img data-src="https://static.wikia.nocookie.net/aesthetics/images/1/11/${name}/revision/latest/scale-to-width-down/${w}?cb=1" width="${w}" height="${w}"></a>`
+  const src = (name) => `https://static.wikia.nocookie.net/aesthetics/images/1/11/${name}/revision/latest?cb=1`
+
+  it('keeps the space at the edge of a mark outside it', () => {
+    const { lead } = article('<div class="mw-parser-output"><p>floating clouds<b> and </b>ancient <a href="/wiki/X">Vaporwave </a>and<i> more</i>.</p></div>')
+    expect(textOf(lead[0].c)).toBe('floating clouds and ancient Vaporwave and more.')
+  })
+
+  it('keeps a picture table with descriptions as a table, pictures in their cells', () => {
+    const { lead } = article(`<div class="mw-parser-output"><table><tr><th>Men's fashion</th><th>Women's fashion</th></tr><tr><td>${pic('A.jpg')}</td><td>${pic('B.jpg')}</td></tr><tr><td>${pic('C.jpg')}</td><td>A wide collar</td></tr></table></div>`)
+    expect(lead).toHaveLength(1)
+    const t = lead[0]
+    expect(t.t).toBe('table')
+    expect(t.rows[0]).toEqual([{ h: 1, c: ["Men's fashion"] }, { h: 1, c: ["Women's fashion"] }])
+    expect(t.rows[1][0].imgs[0].src).toBe(src('A.jpg'))
+    expect(t.rows[2][1]).toEqual({ c: ['A wide collar'] })
+  })
+
+  it('turns a grid of captioned pictures into a gallery', () => {
+    const { lead } = article(`<div class="mw-parser-output"><table><tr><td>${pic('A.jpg')}<br>Chairs</td><td>${pic('B.jpg')}<br>Lamps</td></tr></table></div>`)
+    expect(lead[0]).toEqual({ t: 'gallery', items: [{ src: src('A.jpg'), w: 200, h: 200, cap: ['Chairs'] }, { src: src('B.jpg'), w: 200, h: 200, cap: ['Lamps'] }] })
+  })
+
+  it('leaves out pictures whose table cell or list item says they were made by AI', () => {
+    const t = article(`<div class="mw-parser-output"><table><tr><td>${pic('A.jpg')}</td><td>${pic('B.jpg')} AI-generated image of a mall</td></tr><tr><td>Text</td><td>More</td></tr></table></div>`).lead[0]
+    expect(JSON.stringify(t)).not.toContain('B.jpg')
+    const l = article(`<div class="mw-parser-output"><ul><li>${pic('A.jpg')} A real one</li><li>${pic('B.jpg')} AI generated art of a mall</li></ul></div>`).lead
+    expect(JSON.stringify(l)).not.toContain('B.jpg')
+    expect(JSON.stringify(l)).toContain('A.jpg')
+  })
+
+  it('keeps the pictures of a list where only some items have one, in a gallery after it', () => {
+    const { lead } = article(`<div class="mw-parser-output"><ul><li>Plain item</li><li>${pic('A.jpg')} Pictured item</li></ul></div>`)
+    expect(lead.map((b) => b.t)).toEqual(['ul', 'img'])
+    expect(lead[0].items.map((i) => textOf(i.c))).toEqual(['Plain item', 'Pictured item'])
+    expect(lead[1].img).toEqual({ src: src('A.jpg'), w: 200, h: 200, cap: ['Pictured item'] })
+  })
+
+  it('keeps the words of a link that also holds an icon', () => {
+    const { lead } = article(`<div class="mw-parser-output"><p>See <a href="/wiki/Y2K_Futurism"><img src="https://static.wikia.nocookie.net/aesthetics/images/1/11/Icon.png/revision/latest" width="16" height="16"> Y2K Futurism</a>.</p></div>`)
+    expect(lead[0].c).toContainEqual({ t: 'a', c: ['Y2K Futurism'], w: 'Y2K Futurism' })
   })
 })

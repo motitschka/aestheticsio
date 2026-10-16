@@ -63,7 +63,8 @@ function inline(nodes) {
     if (!isEl(n) || skipped(n)) continue
     const t = tag(n)
     if (t === 'br') out.push({ t: 'br' })
-    else if (t === 'img' || n.querySelector('img') && t === 'a') continue
+    // a picture's own link goes with the picture; a link with an icon and words keeps the words
+    else if (t === 'img' || (t === 'a' && n.querySelector('img') && !n.text.trim())) continue
     else if (t === 'a') {
       const c = inline(n.childNodes)
       const target = has(n, 'new') ? { plain: true } : linkTarget(n.getAttribute('href'))
@@ -85,16 +86,28 @@ const isBr = (x) => typeof x === 'object' && x.t === 'br'
 /** Merges neighbouring text, trims the ends and drops empty marks. */
 export function tidy(list) {
   const out = []
-  for (let x of list) {
-    if (typeof x === 'object' && (x.t === 'b' || x.t === 'i' || x.t === 'a')) {
-      const c = tidyInner(x.c)
-      if (!c.length) continue
-      x = { ...x, c }
-    }
+  const add = (x) => {
     const last = out[out.length - 1]
-    if (typeof x === 'string' && typeof last === 'string') out[out.length - 1] = (last + x).replace(/ {2,}/g, ' ')
-    else if (isBr(x) && (out.length === 0 || isBr(last))) continue
-    else out.push(typeof x === 'string' ? x.replace(/ {2,}/g, ' ') : x)
+    if (typeof x === 'string') {
+      if (typeof last === 'string') out[out.length - 1] = (last + x).replace(/ {2,}/g, ' ')
+      else out.push(x.replace(/ {2,}/g, ' '))
+    } else if (isBr(x)) {
+      if (out.length && !isBr(last)) out.push(x)
+    } else out.push(x)
+  }
+  for (const x of list) {
+    if (typeof x === 'object' && (x.t === 'b' || x.t === 'i' || x.t === 'a')) {
+      // Spaces at the edges of a mark belong outside it: "<a>Vaporwave </a>and" keeps its space.
+      const raw = textOf(x.c)
+      const c = tidyInner(x.c)
+      if (/^\s/.test(raw)) add(' ')
+      if (c.length) {
+        add({ ...x, c })
+        if (/\s$/.test(raw)) add(' ')
+      }
+      continue
+    }
+    add(x)
   }
   // trim around the edges and line breaks
   for (let i = 0; i < out.length; i++) {
@@ -134,12 +147,19 @@ function imageOf(img) {
   const h = Number(img.getAttribute('height')) || undefined
   if (w && w < 48) return null
   // A file without a picture's extension is a video; the address is its still.
-  const file = decodeURIComponent(src.match(/\/images\/\w\/\w\w\/([^/]+)\/revision/)?.[1] ?? '')
+  const file = safeDecode(src.match(/\/images\/\w\/\w\w\/([^/]+)\/revision/)?.[1] ?? '')
   const video = file && !PICTURE.test(file) ? { v: `${WIKI}File:${encodeURIComponent(file).replace(/%2C/g, ',')}` } : {}
   return { src, ...(w && h ? { w, h } : {}), ...video }
 }
 
 const PICTURE = /\.(jpe?g|png|gif|webp|avif|bmp|tiff?)$/i
+const safeDecode = (s) => {
+  try {
+    return decodeURIComponent(s)
+  } catch {
+    return s
+  }
+}
 const WIKI = 'https://aesthetics.fandom.com/wiki/'
 
 const CAPTION = ['figcaption', '.thumbcaption', '.lightbox-caption', '.gallerytext', '.wikia-gallery-caption', '.caption', '.image-caption']
@@ -221,7 +241,7 @@ function videoOf(el) {
   const yt = raw.match(/youtube(?:-nocookie)?\.com\/embed\/([\w-]{6,})/)?.[1] ?? raw.match(/data-video-id="([\w-]{6,})"/)?.[1]
   const cap = captionOf(el)
   const extra = cap?.length ? { cap } : {}
-  if (yt) return { t: 'video', yt, href: `https://www.youtube.com/watch?v=${yt}`, ...extra }
+  if (yt) return { t: 'video', href: `https://www.youtube.com/watch?v=${yt}`, ...extra }
   const spotify = raw.match(/https:\/\/open\.spotify\.com\/(?:embed\/)?([\w/-]+)/)?.[1]
   if (spotify) return { t: 'video', href: `https://open.spotify.com/${spotify}`, ...extra }
   return null
@@ -229,45 +249,63 @@ function videoOf(el) {
 
 // ---------- blocks ----------
 
-function list(el) {
+/**
+ * A list. Pictures in its items go to `pictures` (captioned by their item) for a
+ * gallery after it, unless every item is just a picture: then the list is the gallery.
+ */
+function list(el, pictures = []) {
   const items = []
   for (const li of el.childNodes) {
     if (!isEl(li) || tag(li) !== 'li' || skipped(li)) continue
     const own = li.childNodes.filter((n) => !(isEl(n) && (tag(n) === 'ul' || tag(n) === 'ol')))
     const subs = li.childNodes.filter((n) => isEl(n) && (tag(n) === 'ul' || tag(n) === 'ol'))
-    const imgs = own.filter(isEl).flatMap((n) => (tag(n) === 'img' || n.querySelector('img') ? imagesIn(n) : []))
     const c = tidy(inline(own))
-    const sub = subs.map(list).filter(Boolean)
+    // an item that says its picture was made by AI loses the picture
+    const imgs = AI.test(textOf(c)) ? [] : own.filter(isEl).flatMap((n) => (tag(n) === 'img' || n.querySelector('img') ? imagesIn(n) : []))
+    const sub = []
+    for (const s of subs) {
+      const b = list(s, pictures)
+      if (b?.t === 'gallery') pictures.push(...b.items)
+      else if (b) sub.push(b)
+    }
     if (!hasText(c) && !sub.length && !imgs.length) continue
-    items.push({ c, ...(sub.length ? { sub } : {}), ...(imgs.length ? { imgs } : {}) })
+    items.push({ c, sub, imgs })
   }
   if (!items.length) return null
   // a list of pictures reads better as a gallery
-  if (items.every((i) => i.imgs?.length === 1 && !i.sub)) return { t: 'gallery', items: items.map((i) => ({ ...i.imgs[0], ...(hasText(i.c) ? { cap: i.c } : {}) })) }
-  return { t: tag(el) === 'ol' ? 'ol' : 'ul', items: items.map(({ imgs: _imgs, ...i }) => i) }
+  if (items.every((i) => i.imgs.length === 1 && !i.sub.length)) return { t: 'gallery', items: items.map((i) => (hasText(i.c) && !i.imgs[0].cap ? { ...i.imgs[0], cap: i.c } : i.imgs[0])) }
+  for (const i of items) for (const img of i.imgs) pictures.push(hasText(i.c) && !img.cap ? { ...img, cap: i.c } : img)
+  const kept = items.filter((i) => hasText(i.c) || i.sub.length)
+  if (!kept.length) return null
+  return { t: tag(el) === 'ol' ? 'ol' : 'ul', items: kept.map((i) => ({ c: i.c, ...(i.sub.length ? { sub: i.sub } : {}) })) }
 }
 
 function table(el) {
   if (has(el, 'navbox') || el.querySelector('.navbox')) return []
   const rows = el.querySelectorAll('tr').filter((tr) => tr.closest('table') === el)
   const cells = rows.map((tr) => tr.childNodes.filter((c) => isEl(c) && (tag(c) === 'td' || tag(c) === 'th')))
-  const images = el.querySelectorAll('img').length
   const flat = cells.flat()
-  // Layout tables of pictures become galleries, captioned by their cells' text.
-  if (images && images >= flat.length / 2) {
-    const items = []
-    for (const cell of flat) {
-      const imgs = imagesIn(cell)
-      const cap = tidy(inline(cell.childNodes))
-      imgs.forEach((img, i) => items.push(i === 0 && !img.cap && hasText(cap) && !AI.test(textOf(cap)) ? { ...img, cap } : img))
-    }
-    return items.length ? [{ t: 'gallery', items }] : []
-  }
   // A table with one cell is a box around content.
   if (flat.length === 1) return nested(flat[0].childNodes)
-  const out = cells
-    .map((row) => row.map((c) => ({ ...(tag(c) === 'th' ? { h: 1 } : {}), c: tidy(inline(c.childNodes)) })))
-    .filter((row) => row.some((c) => hasText(c.c)))
+  const info = cells.map((row) =>
+    row.map((cell) => {
+      const c = tidy(inline(cell.childNodes))
+      const found = imagesIn(cell)
+      // a cell that says its picture was made by AI loses the picture
+      const imgs = AI.test(textOf(c)) ? [] : found
+      return { h: tag(cell) === 'th', c, imgs, pictured: found.length > 0 }
+    }),
+  )
+  const all = info.flat()
+  // Grids of pictures, where every cell with words also holds a picture, become galleries.
+  if (all.some((x) => x.pictured) && all.every((x) => x.pictured || !hasText(x.c))) {
+    const items = all.flatMap((x) => x.imgs.map((img, i) => (i === 0 && !img.cap && hasText(x.c) ? { ...img, cap: x.c } : img)))
+    return items.length ? [{ t: 'gallery', items }] : []
+  }
+  // Anything else stays a table, pictures in their cells.
+  const out = info
+    .map((row) => row.map((x) => ({ ...(x.h ? { h: 1 } : {}), c: x.c, ...(x.imgs.length ? { imgs: x.imgs } : {}) })))
+    .filter((row) => row.some((x) => hasText(x.c) || x.imgs))
   if (!out.length) return []
   const cap = el.querySelector('caption')
   return [{ t: 'table', rows: out, ...(cap ? { cap: tidy(inline(cap.childNodes)) } : {}) }]
@@ -354,7 +392,7 @@ export function blocks(nodes) {
     if (t === 'p') {
       flush()
       // pictures set straight into a paragraph come after its text
-      const pics = n.childNodes.filter((c) => isEl(c) && (isFrame(c) || (tag(c) === 'a' && c.querySelector('img')) || tag(c) === 'img' || (tag(c) === 'span' && c.querySelector('img'))))
+      const pics = n.childNodes.filter((c) => isEl(c) && (isFrame(c) || (tag(c) === 'a' && c.querySelector('img') && !c.text.trim()) || tag(c) === 'img' || (tag(c) === 'span' && c.querySelector('img') && !c.text.trim())))
       const c = tidy(inline(n.childNodes.filter((x) => !pics.includes(x))))
       if (hasText(c)) out.push({ t: 'p', c })
       const imgs = pics.flatMap((x) => (tag(x) === 'img' ? [imageOf(x)].filter(Boolean) : imagesIn(x)))
@@ -364,8 +402,11 @@ export function blocks(nodes) {
     }
     if (t === 'ul' || t === 'ol') {
       flush()
-      const l = list(n)
+      const pictures = []
+      const l = list(n, pictures)
       if (l) out.push(l)
+      if (pictures.length === 1) out.push({ t: 'img', img: pictures[0] })
+      else if (pictures.length) out.push({ t: 'gallery', items: pictures })
       continue
     }
     if (t === 'dl') {
@@ -399,7 +440,7 @@ export function blocks(nodes) {
     if (t === 'hr') continue
     if (INLINE.has(t)) {
       // an inline element holding a picture (mw:File spans, bare image links)
-      if (n.querySelector('img') && (t === 'a' || t === 'span')) {
+      if (n.querySelector('img') && (t === 'a' || t === 'span') && !n.text.trim()) {
         flush()
         out.push(...imageBlocks(n))
       } else run.push(...inline([n]))

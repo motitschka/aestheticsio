@@ -85,11 +85,15 @@ for (const p of pages) {
     return id ? { id } : { href: wikiUrl(to) }
   }
   const body = relink({ lead: p.lead, sections: p.sections }, resolve)
-  const out = { id: p.a.id, title: p.title, url: wikiUrl(p.title), rev: p.rev, fetched: new Date().toISOString().slice(0, 10), ...body }
+  const file = new URL(`${p.a.id}.json`, OUT)
+  // An unchanged article keeps its date, so a refresh only rewrites what changed.
+  const before = await readFile(file, 'utf8').then(JSON.parse, () => null)
+  const same = before && JSON.stringify({ ...before, fetched: '' }) === JSON.stringify({ id: p.a.id, title: p.title, url: wikiUrl(p.title), rev: p.rev, fetched: '', ...body })
+  const out = { id: p.a.id, title: p.title, url: wikiUrl(p.title), rev: p.rev, fetched: same ? before.fetched : new Date().toISOString().slice(0, 10), ...body }
   const json = JSON.stringify(out)
   images += (json.match(/"src":/g) ?? []).length
   bytes += json.length
-  await writeFile(new URL(`${p.a.id}.json`, OUT), json)
+  await writeFile(file, json)
   written.add(`${p.a.id}.json`)
 }
 

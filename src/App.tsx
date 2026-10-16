@@ -408,6 +408,8 @@ export default function App() {
     )
   }
   if (!data || backend === undefined || account === undefined) return <Splash />
+  // A wiki page waits for its theme rather than showing in another one.
+  if (route?.id && byId.has(route.id) && !themes && !themesFailed) return <Splash />
 
   if (account) {
     if (status === 'loading') return <Splash />
@@ -447,7 +449,8 @@ export default function App() {
 
   const lesson = lessonId ? byId.get(lessonId) : undefined
   const current: Tab = route ? 'wiki' : tab
-  const showTabs = !lesson && (!inRound || !!route)
+  // A round in progress hides the tabs on Play only: leaving it for the wiki and on to another tab keeps them.
+  const showTabs = !lesson && (!inRound || current !== 'play')
   const wide = !!route && !lesson
 
   return (

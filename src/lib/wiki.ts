@@ -29,8 +29,9 @@ export type Block =
   | { t: 'quote'; c: Block[] }
   | { t: 'img'; img: WikiImage; side?: 'left' | 'center' }
   | { t: 'gallery'; items: WikiImage[] }
-  | { t: 'table'; rows: { h?: 1; c: Inline[] }[][]; cap?: Inline[] }
-  | { t: 'video'; href: string; yt?: string; cap?: Inline[] }
+  | { t: 'table'; rows: { h?: 1; c: Inline[]; imgs?: WikiImage[] }[][]; cap?: Inline[] }
+  /** A YouTube or Spotify embed, shown as a link (no pictures from other sites) */
+  | { t: 'video'; href: string; cap?: Inline[] }
 
 export interface WikiSection {
   title: string
